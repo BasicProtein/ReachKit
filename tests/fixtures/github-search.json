@@ -1,0 +1,20 @@
+{
+  "items": [
+    {
+      "full_name": "reachkit/demo",
+      "html_url": "https://github.com/reachkit/demo",
+      "description": "Demo repository",
+      "default_branch": "main",
+      "stargazers_count": 7,
+      "language": "Python"
+    },
+    {
+      "full_name": "reachkit/sample",
+      "html_url": "https://github.com/reachkit/sample",
+      "description": null,
+      "default_branch": "trunk",
+      "stargazers_count": 3,
+      "language": null
+    }
+  ]
+}

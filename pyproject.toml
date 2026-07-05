@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "reachkit"
+version = "0.1.0"
+description = "Small retrieval toolkit for public web, RSS, and GitHub content."
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+  { name = "ReachKit Contributors" }
+]
+license = { text = "Apache-2.0" }
+dependencies = []
+
+[project.scripts]
+reachkit = "reachkit.cli.app:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

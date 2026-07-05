@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>ReachKit Notes</title>
+    <item>
+      <title>First Note</title>
+      <link>https://example.com/first</link>
+      <description>Alpha note text.</description>
+      <pubDate>Mon, 01 Jan 2024 00:00:00 GMT</pubDate>
+    </item>
+    <item>
+      <title>Second Note</title>
+      <link>https://example.com/second</link>
+      <description>Beta note text.</description>
+    </item>
+  </channel>
+</rss>

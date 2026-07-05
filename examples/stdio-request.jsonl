@@ -1,0 +1,4 @@
+{"id":"1","method":"tools/list","params":{}}
+{"id":"2","method":"tools/call","params":{"name":"web_read","arguments":{"url":"https://example.com","max_chars":2000}}}
+{"id":"3","method":"tools/call","params":{"name":"github_search","arguments":{"query":"agent tools","limit":3}}}
+{"id":"4","method":"tools/call","params":{"name":"missing_tool","arguments":{}}}
