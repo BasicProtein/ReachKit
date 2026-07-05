@@ -19,7 +19,8 @@ def test_tools_list_response_contains_expected_tools():
     response = StdioServer().handle_line('{"id":"1","method":"tools/list","params":{}}')
 
     assert response["ok"] is True
-    assert [tool["name"] for tool in response["result"]["tools"]] == [
+    names = [tool["name"] for tool in response["result"]["tools"]]
+    expected = [
         "web_read",
         "rss_read",
         "github_read",
@@ -30,6 +31,8 @@ def test_tools_list_response_contains_expected_tools():
         "xiaohongshu_api",
         "browser_read",
     ]
+    assert all(name in names for name in expected)
+    assert [name for name in names if name in expected] == expected
 
 
 def test_tools_call_uses_injected_handler():

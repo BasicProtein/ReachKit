@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from collections.abc import Callable
+import json
+import os
+from urllib.parse import urlencode
 
 from reachkit.core.errors import InputError, ParseError
 from reachkit.core.models import RetrievedItem, SourceResult
@@ -60,3 +63,34 @@ class WebReader:
             items=[item],
             warnings=warnings,
         )
+
+
+class WebSearchReader:
+    name = "web"
+
+    def __init__(self, fetcher: FetchText | None = None, endpoint: str | None = None) -> None:
+        self._fetcher = fetcher
+        self._endpoint = endpoint
+
+    def search(self, query: str, limit: int = 10) -> SourceResult:
+        endpoint = self._endpoint or os.environ.get("REACHKIT_WEB_SEARCH_URL")
+        if not endpoint:
+            raise InputError("REACHKIT_WEB_SEARCH_URL is required for web search")
+        active_limit = max(1, min(limit, 50))
+        separator = "&" if "?" in endpoint else "?"
+        url = endpoint + separator + urlencode({"q": query, "limit": active_limit})
+        response = (self._fetcher or fetch_text)(url)
+        try:
+            payload = json.loads(response.body)
+        except json.JSONDecodeError as exc:
+            raise ParseError("Web search response was not valid JSON") from exc
+        records = payload.get("items") if isinstance(payload, dict) else payload
+        items: list[RetrievedItem] = []
+        for record in list(records or [])[:active_limit]:
+            if not isinstance(record, dict):
+                continue
+            title = str(record.get("title") or record.get("url") or "Web result")
+            item_url = record.get("url") or record.get("link")
+            text = compact_text(str(record.get("snippet") or record.get("text") or title))
+            items.append(RetrievedItem(title=title, url=item_url, text=text, metadata={}))
+        return SourceResult(self.name, url, f"Web search: {query}", response.headers.get("Content-Type"), items, [])

@@ -5,10 +5,13 @@ import sys
 from collections.abc import Sequence
 
 from reachkit import __version__
+from reachkit.cli.commands.auth import add_auth_parser
+from reachkit.cli.commands.channels import add_channels_parser
 from reachkit.cli.commands.doctor import add_doctor_parser
 from reachkit.cli.commands.read import add_read_parser
 from reachkit.cli.commands.search import add_search_parser
 from reachkit.cli.commands.serve import add_serve_parser
+from reachkit.cli.commands.setup import add_setup_parser
 from reachkit.core.errors import ReachKitError
 
 
@@ -31,8 +34,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     subparsers = parser.add_subparsers(dest="command")
     add_read_parser(subparsers)
+    add_auth_parser(subparsers)
+    add_channels_parser(subparsers)
     add_search_parser(subparsers)
     add_doctor_parser(subparsers)
+    add_setup_parser(subparsers)
     add_serve_parser(subparsers)
     return parser
 

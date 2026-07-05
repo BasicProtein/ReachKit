@@ -7,73 +7,99 @@
   <a href="README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
 </p>
 
-ReachKit は、AI agent が公共の Web ページ、RSS または Atom feed、GitHub コンテンツ、YouTube transcript、X post、Xiaohongshu open API JSON、Bilibili video metadata を安定して読むための Python CLI とライブラリです。
+ReachKit は、AI agent のためのクリーンな internet intake layer です。Web ページと feed を読み、GitHub を調べ、transcript と metadata を取得し、対応 platform を検索して、agent がそのまま使える小さな JSON record を返します。
 
-ブラウザーセッション、ログインフロー、クローラー基盤、有料検索スタックを使わずに取得処理を行いたい agent ワークフロー向けです。公共 URL、feed、リポジトリ、ファイルパス、GitHub 検索クエリ、YouTube video、X post id、Xiaohongshu open API path、Bilibili video idを渡すと、ReachKit は安定した JSON フィールドを持つ正規化済みテキストレコードを返します。agent はそれを確認、引用、保存、順位付け、次のツールへの入力に使えます。
+agent は reasoning は得意でも、retrieval で壊れがちです。生の Web ページはノイズが多く、platform API には token が必要なことがあり、video transcript は公開 timed text がある場合だけ使えます。小さな script も、JSON に log を混ぜると tool chain では扱いづらくなります。ReachKit はその境界を、予測しやすい CLI command、stdio tool、provider diagnostic、明示的 setup guide に整理します。
 
-## ReachKit が必要な理由
+公共コンテンツまたは明示的に許可されたコンテンツを扱う workflow 向けです。hidden browser extraction、login automation、crawler farm、proxy machinery、silent credential collection は行いません。URL、feed、repository、file path、platform query、post id、stock symbol、podcast feed、authorized API target を渡すと、ReachKit は安定した field を持つ normalized text record を返します。
 
-AI agent は公共コンテキストを取得するとき、同じ問題に何度もぶつかります。
+## Agent がこれを必要とする理由
 
-- 検索スニペットだけでは推論に足りません。agent にはタイトルと URL だけでなく、ページ本文、feed エントリ、リポジトリメタデータ、ファイル内容が必要です。
-- Web コンテンツの形式はばらばらです。HTML、プレーンテキスト、RSS、Atom、GitHub API payload は、それぞれ解析してからでないと使いにくいです。
-- 単純な公共コンテンツにはブラウザー自動化が重すぎます。多くの処理は HTTP、テキスト整形、予測しやすい出力だけで足ります。
-- その場限りのスクリプトは信頼しにくいです。あるコマンドは文章を出し、別のコマンドは不完全な JSON を出し、別のコマンドは stdout に警告を混ぜます。
-- agent の tool call には契約が必要です。返り値の形が毎回変わるツールは、処理の連鎖に入れづらくなります。
-- 公開リポジトリも調査対象です。agent は README、概要、言語、stars、default branch、GitHub 検索結果を必要とすることがあります。
-- ローカル診断は重要です。GitHub token の不足、HTTPS runtime の問題、UTF-8 ではないコンソールは、1 回の実行を丸ごと無駄にします。
+AI agent は model の弱さだけで失敗するわけではありません。input layer が不安定だと失敗します。
 
-ReachKit は「agent が公共コンテキストを必要としている」状態から「agent が推論に使えるきれいなテキストを得る」状態までの、地味だけれど重要な層を担当します。
+- 検索結果は page の存在を示しますが、reasoning には本文が必要です。
+- feed、GitHub response、transcript、social post はそれぞれ違う形で届きます。
+- token や dependency の不足を実行中に見つけると、その run は無駄になります。
+- 単純な公共コンテンツには browser automation が重く、HTTP、parse、clean output で足ります。
+- shell snippet は warning、log、data が stdout に混ざると chain しにくくなります。
+- credential handling は慎重であるべきで、tool が browser profile を黙って読んだり token value を保存したりすべきではありません。
+
+ReachKit は reasoning の前に input step を処理します。fetch、normalize、warn を行い、何が ready かを agent に伝えます。
 
 ## どこで使うか
 
-Web 検索、クロール、JavaScript レンダリング、Markdown 抽出、ランキング、マネージドリサーチには、強力なホスト型 API があります。ReachKit は、もっと小さくローカルな、それでも信頼性が必要な仕事に向いています。
+hosted crawler や場当たり的な script ではなく、local で inspectable な retrieval layer が欲しいときに使います。
 
-- 読みたい公共 URL、feed、リポジトリ、GitHub クエリがすでに分かっている。
-- Python コマンドとして CI、ローカルスクリプト、agent sandbox で動かしたい。
-- 次のツールが解析しやすいように、stdout を機械可読に保ちたい。
-- サイレントな部分出力ではなく、明示的な警告と型のあるエラーが欲しい。
-- 公共 Web ページ、feed、GitHub メタデータ、GitHub テキストファイルを同じ取得経路で扱いたい。
-- RAG、要約、監視、開発者調査のための低設定な入力段階が必要。
+- URL、feed、repository、video、post、stock symbol、platform query が分かっている。
+- agent loop、RAG ingestion、CI check、monitoring job のために stable JSON が必要。
+- Web page、feed、GitHub、transcript、post、platform search を同じ result shape で扱いたい。
+- `doctor` に、何が動き、何に config が必要で、次に何をすべきかを出してほしい。
+- hidden session reading ではなく、明示的 env var と user-supplied file を使いたい。
+- まず simple path を使い、必要な場合だけ rendered-page read を選びたい。
 
-要するに、ReachKit は Web 全体のランキングを解く道具ではありません。既知の公共ソースを、agent が信頼できるきれいなレコードに変えるための道具です。
+ReachKit は Web 全体を ranking するものではありません。既知の public source または明示的に許可された source を、agent が信頼できる record に変換します。
+
+## 5 分でできること
+
+```bash
+reachkit setup plan
+reachkit channels doctor
+reachkit read url https://example.com --format json
+reachkit read github owner/repo --path README.md --format json
+reachkit serve stdio
+```
+
+これで agent は readiness map、Web reader、GitHub reader、stdio tool server を使えます。source ごとに別 schema を覚える必要はありません。
 
 ## 機能
 
+| User pain | ReachKit path |
+| --- | --- |
+| "agent には URL があるが、使える本文が必要。" | `reachkit read url`、RSS、podcast feed、optional rendered-page reader。 |
+| "agent に code と project context が必要。" | GitHub repo、file、repository search、issue、pull request、release reader。 |
+| "platform content を同じ shape で扱いたい。" | YouTube、X、Xiaohongshu、Bilibili、Reddit、V2EX、LinkedIn、Xueqiu、Facebook、Instagram reader/searcher。 |
+| "setup 不足で run が落ちる。" | `setup plan`、`channels doctor`、`auth status`、fix message。 |
+| "agent runtime には prose ではなく tool が必要。" | `reachkit serve stdio` with `tools/list` and `tools/call`。 |
+| "credential は明示的に扱いたい。" | config は env var 名と user-supplied file path だけを保存し、token value は保存しません。 |
+
 ReachKit が現在できること：
 
+- setup plan/install/update/remove。dry-run と safe mode に対応します。
+- channels list/doctor による platform capability、provider readiness、missing config、fix guidance の確認。
+- auth status/set。local config には env var 名と明示的な file path を保存し、token value はデフォルトで保存しません。
 - `text/html`、`text/plain`、その他の読み取り可能な `text/*` レスポンスを持つ公共 URL の読み取り。
 - URL 読み取りでは、ユーザーが明示的に指定した JSON cookie list、Netscape cookie file、Playwright storage state file を使えます。
 - Python 標準ライブラリによる HTML title 抽出と本文テキスト整形。
 - RSS と Atom feed の解析、および正規化済みエントリメタデータの出力。
-- 公開 GitHub REST API によるリポジトリメタデータの読み取り。
-- GitHub contents API によるリポジトリ内テキストファイルの読み取り。base64 テキストファイルにも対応します。
-- 公開 GitHub リポジトリ検索と安定した項目フィールド。
-- 公開 timed text がある YouTube transcript の読み取り。
-- official API による X post の読み取り。`X_BEARER_TOKEN` または `TWITTER_BEARER_TOKEN` が必要です。
-- Xiaohongshu open API JSON の読み取り。`XHS_APP_KEY` と `XHS_APP_SECRET` が必要です。
-- BV video id に対する Bilibili public video metadata の読み取り。
+- GitHub repository metadata、file reading、repository search、issues、pull requests、releases。
+- 公開 timed text がある YouTube transcript と、明示的 API key を使う YouTube metadata/search。
+- official API による X post、search、conversation query、timeline-style query。`X_BEARER_TOKEN` または `TWITTER_BEARER_TOKEN` が必要です。
+- Xiaohongshu open API JSON、note search、note detail、comments。`XHS_APP_KEY` と `XHS_APP_SECRET` が必要です。
+- Bilibili public video metadata と public video search。
+- Reddit public search、posts、comments。
+- V2EX hot topics、node topics、replies 付き topic detail、user records。
+- podcast RSS metadata と episode records。
+- LinkedIn public page text。
+- Xueqiu quote、stock search、hot records。
+- 明示的 token を使う Facebook / Instagram Graph API records。
 - optional `reachkit[browser]` による、ユーザーが access できる rendered page text の読み取り。
-- Python バージョン、UTF-8 I/O、HTTPS runtime、GitHub token、ネットワークを確認する `doctor` コマンド。
 - agent tool integration 向けの newline-delimited JSON stdio server。
 - コンテンツコマンドの text / JSON 出力。
 
-ReachKit は完全な Web クローラーではありません。browser profile の読み取り、access challenge の処理、proxy pool、login-only page は扱いません。URL 読み取りで cookie を使うのは、ユーザーが cookie file を明示的に指定した場合だけです。
+ReachKit は完全な Web クローラーではありません。browser profile の読み取り、access challenge の処理、proxy pool、fingerprint spoofing、login state の自動収集は行いません。認証が必要な path では、ユーザーが env var、cookie file、storage-state file、official API token を明示的に渡す必要があります。
 
 ## 向いている用途
 
 ReachKit は次の用途に向いています。
 
-- 公共 Web ページ本文を必要とする AI agent tool。
-- YouTube transcript text、X post text、Xiaohongshu open API JSON、Bilibili video metadata を他の source と同じ JSON shape で扱う workflow。
-- README、docs ページ、release feed の取得ワークフロー。
-- RSS または Atom feed を読んでから要約する research assistant。
-- developer agent 向けの GitHub repository discovery tool。
-- deterministic JSON が必要なローカル CLI pipeline。
-- request / response object を期待する agent runtime 向け stdio tool。
-- 公共ページと feed の軽量 RAG ingestion script。
-- 公開 docs、changelog、feed、GitHub file を監視する CI check。
-- ブラウザーを起動せずに Web、feed、repository context が必要な developer research script。
+- thin snippet ではなく公共 Web ページ本文が必要な AI agent tool。
+- source を集めてから要約、比較、claim check を行う research assistant。
+- chunking と embedding の前に stable record が必要な RAG ingestion script。
+- README、docs、release、issue、repository を調べる developer agent。
+- feed、changelog、public docs、platform record を監視する job。
+- stdout を parseable に保つ必要がある local CLI pipeline。
+- handwritten shell snippet より request/response tool を好む agent runtime。
+- platform-specific content を扱いつつ、platform ごとの schema を増やしたくない workflow。
 
 ユーザーが access できる JavaScript rendered page を読む場合は optional browser extra を使えます。大規模 crawling、access challenge handling、proxy pool、anti-abuse platform handling が必要なら、ReachKit はその層ではありません。
 
@@ -105,6 +131,22 @@ python -m playwright install chromium
 
 ## Quick start
 
+local setup plan を確認する：
+
+```bash
+reachkit setup plan
+reachkit setup install --dry-run
+reachkit setup install --safe
+```
+
+platform と auth status を確認する：
+
+```bash
+reachkit channels list
+reachkit channels doctor
+reachkit auth status
+```
+
 公共 Web ページを読む：
 
 ```bash
@@ -135,16 +177,43 @@ reachkit read github owner/repo --path README.md --ref main --format json
 reachkit search github "agent tools" --limit 5 --format json
 ```
 
+configured web endpoint を検索する：
+
+```bash
+reachkit search web "agent tools" --limit 5 --format json
+```
+
+GitHub issue、pull request、release を読む：
+
+```bash
+reachkit read github owner/repo --issue 7 --format json
+reachkit read github owner/repo --pull-request 3 --format json
+reachkit read github owner/repo --release v1.0.0 --format json
+```
+
 public timed text がある YouTube transcript を読む：
 
 ```bash
 reachkit read youtube dQw4w9WgXcQ --lang en --format json
+reachkit read youtube dQw4w9WgXcQ --metadata --format json
+```
+
+YouTube を検索する：
+
+```bash
+reachkit search youtube "agent tools" --limit 5 --format json
 ```
 
 official API で X post を読む：
 
 ```bash
 reachkit read x 1234567890 --format json
+```
+
+official API で X を検索する：
+
+```bash
+reachkit search x "agent tools" --limit 5 --format json
 ```
 
 configured app credentials で Xiaohongshu open API JSON を読む：
@@ -158,6 +227,21 @@ BV id または av id で Bilibili public video metadata を読む：
 ```bash
 reachkit read bilibili BV1xx411c7mD --format json
 reachkit read bilibili av123456 --format json
+```
+
+その他の source を読む：
+
+```bash
+reachkit search bilibili "agent tools" --limit 5 --format json
+reachkit read reddit https://www.reddit.com/r/example/comments/abc/title/ --format json
+reachkit read v2ex hot --limit 5 --format json
+reachkit read v2ex topic:1 --limit 5 --format json
+reachkit read podcast https://example.com/feed.xml --limit 5 --format json
+reachkit read linkedin https://www.linkedin.com/company/example/ --format json
+reachkit read xueqiu SH600000 --format json
+reachkit read xueqiu hot --limit 5 --format json
+reachkit read facebook page_id --format json
+reachkit read instagram instagram_user_id --format json
 ```
 
 明示的な cookie file 付きで URL を読む：
@@ -214,7 +298,7 @@ reachkit serve stdio
 
 すべての content result には次が含まれます。
 
-- `source`: `web`、`rss`、`github`、`youtube`、`x`、`xiaohongshu`、`bilibili`。
+- `source`: `web`、`rss`、`github`、`youtube`、`x`、`xiaohongshu`、`bilibili`、`reddit`、`v2ex`、`podcast`、`linkedin`、`xueqiu`、`facebook`、`instagram`。
 - `url`: request URL、または利用可能な canonical result URL。
 - `title`: page、feed、repository、search、file の title。
 - `content_type`: 利用可能な HTTP content type。
@@ -242,14 +326,30 @@ reachkit serve stdio
 利用可能な tools：
 
 - `web_read`: `url`、任意の `max_chars`、任意の `cookie_file`、任意の `storage_state`。
+- `web_search`: `query`、任意の `limit`。
 - `rss_read`: `url`、任意の `limit`。
 - `github_read`: `repo`、任意の `path`、任意の `ref`。
 - `github_search`: `query`、任意の `limit`。
 - `youtube_transcript`: `video`、任意の `lang`、任意の `max_chars`。
+- `youtube_metadata`: `video`。
+- `youtube_search`: `query`、任意の `limit`。
 - `x_read`: `post`。
+- `x_search`: `query`、任意の `limit`。
 - `xiaohongshu_api`: `path`、任意の `query` object。
+- `xiaohongshu_read`: `path`、任意の `query` object。
 - `bilibili_read`: `video`。
+- `bilibili_search`: `query`、任意の `limit`。
+- `reddit_read`: `target`、任意の `limit`。
+- `reddit_search`: `query`、任意の `limit`。
+- `v2ex_read`: `target`、任意の `limit`。
+- `podcast_read`: `url`、任意の `limit`。
+- `xueqiu_quote`: `symbol`。
+- `xueqiu_hot`: 任意の `limit`。
 - `browser_read`: `url`、任意の `storage_state`、任意の `wait_until`、任意の `max_chars`。
+- `channels_list`: 引数なし。
+- `channels_doctor`: 任意の `channel`。
+- `auth_status`: 引数なし。
+- `setup_plan`: 引数なし。
 
 小さな request set は `examples/stdio-request.jsonl` にあります。
 
@@ -277,9 +377,26 @@ export XHS_APP_KEY=your_key
 export XHS_APP_SECRET=your_secret
 ```
 
-YouTube transcript reading は、video が公開 timed text track を提供している場合に使えます。すべての video が public transcript を提供するわけではありません。
+YouTube transcript reading は、video が公開 timed text track を提供している場合に使えます。YouTube search には `YOUTUBE_API_KEY` が必要です。
 
-Bilibili video reading は BV id の public metadata を取得します。
+Web search には `REACHKIT_WEB_SEARCH_URL` が必要です。この値は `q` と `limit` query parameter を受け取る JSON endpoint を指します。YouTube metadata は YouTube search と同じ `YOUTUBE_API_KEY` setting を使います。
+
+Bilibili video reading/search は public metadata path が reachable な場合に利用できます。
+
+Facebook と Instagram は Graph API を使い、明示的 token が必要です。
+
+```powershell
+$env:FACEBOOK_ACCESS_TOKEN = "your_token_here"
+$env:INSTAGRAM_ACCESS_TOKEN = "your_token_here"
+```
+
+ReachKit config は env var 名と明示的 file path だけを保存します。
+
+```bash
+reachkit auth set github --token-env GITHUB_TOKEN
+reachkit auth set browser --storage-state storage-state.json
+reachkit auth set web --cookie-file cookies.json
+```
 
 URL reads では `--cookie-file` または `--storage-state` を使って cookie input を明示的に指定できます。ReachKit はユーザーが渡した JSON cookie list、Netscape cookie file、Playwright storage state file を読みます。これらの file は Git に入れないでください。
 

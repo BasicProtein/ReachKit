@@ -56,6 +56,15 @@ class XiaohongshuApiReader:
         except json.JSONDecodeError as exc:
             raise ParseError("Xiaohongshu response was not valid JSON") from exc
 
+    def search(self, query: str, limit: int = 10) -> SourceResult:
+        return self.read("/api/open/note/search", query={"keyword": query, "limit": str(max(1, limit))})
+
+    def note(self, note_id: str) -> SourceResult:
+        return self.read("/api/open/note/detail", query={"note_id": note_id})
+
+    def comments(self, note_id: str, limit: int = 10) -> SourceResult:
+        return self.read("/api/open/note/comments", query={"note_id": note_id, "limit": str(max(1, limit))})
+
 
 def _sign_request(path: str, query: dict[str, str], app_key: str, app_secret: str, timestamp: str) -> str:
     params = {**query, "app-key": app_key, "timestamp": timestamp}

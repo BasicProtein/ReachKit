@@ -7,73 +7,99 @@
   <a href="README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
 </p>
 
-ReachKit 是一个面向 AI agent 的 Python CLI 和库，用来稳定读取公共网页、RSS 或 Atom feed，以及 GitHub 内容、YouTube 字幕、X post、小红书开放平台 JSON 和 Bilibili 视频元数据。
+ReachKit 给 AI agent 提供一层干净的互联网输入能力：读取网页和 feed、检查 GitHub、拉取字幕和元数据、搜索支持的平台，并返回 agent 真正能使用的小型 JSON 记录。
 
-它适合那些不需要浏览器会话、登录流程、爬虫集群或付费搜索栈的 agent 工作流。给它一个公共 URL、feed、仓库、文件路径、GitHub 搜索查询、YouTube 视频、X post id、小红书开放平台 API path 或 Bilibili 视频 id，ReachKit 会返回字段稳定的标准化文本记录，方便 agent 检查、引用、存储、排序，或传给下一步工具。
+agent 擅长推理，但很容易卡在获取上下文这一步。原始网页噪声很大，平台 API 可能缺 token，视频不一定公开字幕，临时脚本也可能把日志混进 JSON。ReachKit 把这些边缘问题整理成可预测的 CLI 命令、stdio 工具、provider 诊断和显式 setup 指引。
 
-## 为什么需要 ReachKit
+它适合需要读取公共内容或显式授权内容的工作流，不做隐藏浏览器状态提取、登录自动化、爬虫集群、代理机制或静默凭据收集。给它一个 URL、feed、仓库、文件路径、平台查询、post id、股票代码、播客 feed，或授权 API 目标，ReachKit 会返回字段稳定的标准化文本记录，方便 agent 检查、引用、存储、排序，或传给下一步工具。
 
-AI agent 在获取公共上下文时，经常遇到这些问题：
+## 为什么 agent 需要它
 
-- 搜索摘要太薄，无法支撑推理。agent 需要网页正文、feed 条目、仓库元数据和文件内容，而不只是标题和链接。
-- Web 内容形态不统一。HTML、纯文本、RSS、Atom 和 GitHub API payload 都要先解析，agent 才能真正使用。
-- 浏览器自动化对简单公共内容来说太重。很多任务只需要 HTTP、文本清理和稳定输出。
-- 临时脚本很难串联。有的命令输出自然语言，有的输出半截 JSON，有的把警告混进 stdout。
-- agent 工具调用需要契约。一个工具如果有时返回文本、有时崩溃、有时把日志打到结果里，就很难放进链路。
-- 公共仓库也是研究材料。agent 常常需要 README、仓库简介、语言、stars、默认分支和 GitHub 搜索结果。
-- 本地诊断很重要。缺 GitHub token、HTTPS runtime 异常、控制台不是 UTF-8，都可能浪费一次完整运行。
+AI agent 不只会因为模型能力不够而失败，也会因为输入层不可靠而失败：
 
-ReachKit 负责的是一个朴素但关键的层：从“agent 需要公共上下文”到“agent 拿到可推理的干净文本”之间的那段工作。
+- 搜索结果告诉你页面存在，但 agent 仍然需要正文才能推理。
+- feed、GitHub 响应、字幕和社交平台 post 都有不同结构。
+- 缺 token 或依赖时，如果到执行中途才发现，整次运行就会被浪费。
+- 对简单公共内容来说，浏览器自动化太重，HTTP、解析和干净输出就够了。
+- shell 片段很难串联，因为警告、日志和数据经常混在 stdout。
+- 凭据处理很敏感，工具不应该静默读取浏览器 profile 或保存 token 值。
+
+ReachKit 处理推理之前的输入步骤：获取、标准化、报告警告，并告诉 agent 哪些能力已经就绪。
 
 ## 它适合放在哪里
 
-现在有很多成熟的托管 API，可以做网页搜索、站点抓取、JavaScript 渲染、Markdown 提取、排序和托管式研究。ReachKit 处理的是更小、更本地、但仍然需要可靠的任务：
+当你想要一个本地、可检查的检索层，而不是托管爬虫或一堆临时脚本时，可以用 ReachKit：
 
-- 你已经知道要读取的公共 URL、feed、仓库或 GitHub 查询。
-- 你希望用一个 Python 命令跑在 CI、本地脚本或 agent 沙箱里。
-- 你需要 stdout 保持机器可读，方便下一步工具解析。
-- 你希望警告和错误显式出现，而不是悄悄丢掉部分结果。
-- 你想用同一条路径读取公共网页、feed、GitHub 元数据和 GitHub 文本文件。
-- 你需要一个低配置的输入层，用于 RAG、摘要、监控或开发者研究。
+- 你已经知道一个 URL、feed、仓库、视频、post、股票代码或平台查询。
+- 你需要稳定 JSON，用于 agent loop、RAG 入库、CI 检查或监控任务。
+- 你希望网页、feed、GitHub、字幕、post 和平台搜索使用同一种结果结构。
+- 你需要 `doctor` 告诉你哪里能用、哪里缺配置、下一步怎么修。
+- 你偏好显式环境变量和用户提供的文件，而不是隐藏 session 读取。
+- 你希望先走简单路径，只在明确需要时再启用渲染页面读取。
 
-简单说，ReachKit 不解决“给整个互联网排序”这个问题。它解决的是把已知公共来源变成 agent 可以信任的干净记录。
+ReachKit 不负责给整个互联网排序。它负责把已知的公共内容或显式授权内容变成 agent 可以信任的记录。
+
+## 五分钟能做什么
+
+```bash
+reachkit setup plan
+reachkit channels doctor
+reachkit read url https://example.com --format json
+reachkit read github owner/repo --path README.md --format json
+reachkit serve stdio
+```
+
+这会给 agent 一个快速 readiness map、网页读取器、GitHub 读取器和 stdio 工具服务，而且不需要为每个平台学习一套新 schema。
 
 ## 功能
 
+| 用户痛点 | ReachKit 路径 |
+| --- | --- |
+| “agent 有 URL，但需要可用正文。” | `reachkit read url`、RSS、播客 feed 和可选渲染页面读取。 |
+| “agent 需要代码和项目上下文。” | GitHub 仓库、文件、仓库搜索、issue、pull request 和 release 读取。 |
+| “agent 需要同一结构的平台内容。” | YouTube、X、小红书、Bilibili、Reddit、V2EX、LinkedIn、雪球、Facebook 和 Instagram 读取/搜索。 |
+| “运行失败是因为 setup 缺东西。” | `setup plan`、`channels doctor`、`auth status` 和修复建议。 |
+| “agent runtime 要工具，不要自然语言说明。” | `reachkit serve stdio`，支持 `tools/list` 和 `tools/call`。 |
+| “凭据必须显式且可控。” | 配置只保存环境变量名和用户提供的文件路径，不保存 token 值。 |
+
 ReachKit 目前提供：
 
+- setup plan/install/update/remove，支持 dry-run 和 safe 模式。
+- channels list/doctor，用来查看平台能力、provider 状态、缺失配置和修复建议。
+- auth status/set，本地配置只保存环境变量名和显式文件路径，不默认保存 token 明文。
 - 读取公共 URL，处理 `text/html`、`text/plain` 和其他可读的 `text/*` 响应。
 - URL 读取可显式传入 cookie 输入，支持用户提供的 JSON cookie list、Netscape cookie file 或 Playwright storage state file。
 - 使用 Python 标准库提取 HTML 标题并清理正文文本。
 - 解析 RSS 和 Atom feed，并输出标准化条目元数据。
-- 通过公开 GitHub REST API 读取仓库元数据。
-- 通过 GitHub contents API 读取仓库文本文件，包括 base64 编码内容。
-- 搜索公开 GitHub 仓库，并返回稳定字段。
-- 读取公开可用的 YouTube timed text 字幕。
-- 通过官方 API 读取 X post，需要 `X_BEARER_TOKEN` 或 `TWITTER_BEARER_TOKEN`。
-- 通过小红书开放平台读取授权 API JSON，需要 `XHS_APP_KEY` 和 `XHS_APP_SECRET`。
-- 读取 Bilibili BV 视频的公开视频元数据。
+- 读取 GitHub 仓库元数据、文件、仓库搜索、issues、pull requests 和 releases。
+- 读取公开可用的 YouTube timed text 字幕，并用显式 API key 读取 YouTube 元数据和搜索 YouTube。
+- 通过官方 API 读取 X post、搜索、conversation 查询和 timeline-style 查询，需要 `X_BEARER_TOKEN` 或 `TWITTER_BEARER_TOKEN`。
+- 通过小红书开放平台读取授权 API JSON、笔记搜索、笔记详情和评论，需要 `XHS_APP_KEY` 和 `XHS_APP_SECRET`。
+- 读取 Bilibili 公开视频元数据并搜索公开视频。
+- 读取 Reddit 公开搜索、帖子和评论 JSON。
+- 读取 V2EX 热门主题、节点主题、带回复的主题详情和用户记录。
+- 读取播客 RSS 元数据和 episode 记录。
+- 读取 LinkedIn 公开页面文本。
+- 读取雪球行情、股票搜索和热门记录。
+- 在用户显式提供 token 时读取 Facebook 和 Instagram Graph API 记录。
 - 通过可选 `reachkit[browser]` 读取用户有权访问的渲染后页面文本。
-- `doctor` 命令，用于检查 Python 版本、UTF-8 I/O、HTTPS runtime、GitHub token 和网络状态。
 - 面向 agent 工具集成的 newline-delimited JSON stdio server。
 - 内容命令可输出 text 或 JSON。
 
-ReachKit 不是完整网页爬虫。它不读取浏览器 profile，不处理验证码或访问挑战，不运行代理池，也不处理登录内容。只有在用户显式提供 cookie 文件时，URL 读取才会带上这些 cookie。
+ReachKit 不是完整网页爬虫。它不读取浏览器 profile，不处理验证码或访问挑战，不运行代理池，不伪装指纹，也不静默收集登录状态。需要授权的平台必须由用户显式提供环境变量、cookie 文件、storage-state 文件或官方 API token。
 
 ## 适合的场景
 
 ReachKit 适合用于：
 
-- 需要公共网页正文的 AI agent 工具。
-- 需要把 YouTube 字幕、X post 文本、小红书开放平台 JSON 或 Bilibili 视频元数据纳入同一 JSON 输出的工作流。
-- README、文档页和发布 feed 的检索流程。
-- 先读取 RSS 或 Atom feed、再进行摘要的研究助手。
-- 面向开发者 agent 的 GitHub 仓库发现工具。
-- 需要确定性 JSON 的本地命令行管道。
-- 需要 request/response 对象的 stdio agent 工具。
-- 面向公共网页和 feed 的轻量 RAG 入库脚本。
-- 监控公共文档、changelog、feed 或 GitHub 文件的 CI 检查。
-- 不想启动浏览器，但需要网页、feed 和仓库上下文的开发者研究脚本。
+- 需要公共网页正文，而不是只要搜索摘要的 AI agent 工具。
+- 先收集材料，再做摘要、比较或观点核查的研究助手。
+- 在 chunk 和 embedding 前需要稳定记录的 RAG 入库脚本。
+- 检查 README、文档页、release、issue 和仓库的开发者 agent。
+- 监控 feed、changelog、公共文档或平台记录的任务。
+- stdout 必须保持可解析的本地命令行管道。
+- 偏好 request/response 工具，而不是手写 shell 片段的 agent runtime。
+- 需要平台特定内容，但不想为每个平台写一套 schema 的工作流。
 
 如果你需要读取自己有权访问的 JavaScript 渲染页面，可以使用可选 browser extra。如果你需要大规模爬取、访问挑战处理、代理池或反滥用平台处理，ReachKit 不应该位于那一层。
 
@@ -105,6 +131,28 @@ python -m playwright install chromium
 
 ## 快速开始
 
+先查看本地 setup 计划：
+
+```bash
+reachkit setup plan
+reachkit setup install --dry-run
+reachkit setup install --safe
+```
+
+创建默认本地配置：
+
+```bash
+reachkit setup install
+```
+
+检查平台和授权状态：
+
+```bash
+reachkit channels list
+reachkit channels doctor
+reachkit auth status
+```
+
 读取公共网页：
 
 ```bash
@@ -135,16 +183,43 @@ reachkit read github owner/repo --path README.md --ref main --format json
 reachkit search github "agent tools" --limit 5 --format json
 ```
 
+搜索已配置的 Web endpoint：
+
+```bash
+reachkit search web "agent tools" --limit 5 --format json
+```
+
+读取 GitHub issue、pull request 和 release：
+
+```bash
+reachkit read github owner/repo --issue 7 --format json
+reachkit read github owner/repo --pull-request 3 --format json
+reachkit read github owner/repo --release v1.0.0 --format json
+```
+
 读取公开视频的 YouTube 字幕：
 
 ```bash
 reachkit read youtube dQw4w9WgXcQ --lang en --format json
+reachkit read youtube dQw4w9WgXcQ --metadata --format json
+```
+
+使用显式 API key 搜索 YouTube：
+
+```bash
+reachkit search youtube "agent tools" --limit 5 --format json
 ```
 
 通过官方 API 读取 X post：
 
 ```bash
 reachkit read x 1234567890 --format json
+```
+
+通过官方 API 搜索 X：
+
+```bash
+reachkit search x "agent tools" --limit 5 --format json
 ```
 
 使用已配置的 app credentials 读取小红书开放平台 JSON：
@@ -158,6 +233,28 @@ reachkit read xiaohongshu /api/open/path --param note_id=abc --format json
 ```bash
 reachkit read bilibili BV1xx411c7mD --format json
 reachkit read bilibili av123456 --format json
+```
+
+搜索 Bilibili：
+
+```bash
+reachkit search bilibili "agent tools" --limit 5 --format json
+```
+
+读取其他公共或显式 token 平台：
+
+```bash
+reachkit read reddit https://www.reddit.com/r/example/comments/abc/title/ --format json
+reachkit search reddit "agent tools" --limit 5 --format json
+reachkit read v2ex hot --limit 5 --format json
+reachkit read v2ex topic:1 --limit 5 --format json
+reachkit read podcast https://example.com/feed.xml --limit 5 --format json
+reachkit read linkedin https://www.linkedin.com/company/example/ --format json
+reachkit read xueqiu SH600000 --format json
+reachkit read xueqiu hot --limit 5 --format json
+reachkit search xueqiu "bank" --limit 5 --format json
+reachkit read facebook page_id --format json
+reachkit read instagram instagram_user_id --format json
 ```
 
 使用显式 cookie 文件读取 URL：
@@ -214,14 +311,14 @@ reachkit serve stdio
 
 每个内容结果都包含：
 
-- `source`：`web`、`rss`、`github`、`youtube`、`x`、`xiaohongshu` 或 `bilibili`。
+- `source`：`web`、`rss`、`github`、`youtube`、`x`、`xiaohongshu`、`bilibili`、`reddit`、`v2ex`、`podcast`、`linkedin`、`xueqiu`、`facebook` 或 `instagram`。
 - `url`：请求 URL，或可用时的规范结果 URL。
 - `title`：网页、feed、仓库、搜索或文件标题。
 - `content_type`：可用时的 HTTP content type。
 - `items`：标准化文本记录。
 - `warnings`：非致命问题，例如 `empty_feed` 或 `non_html_text`。
 
-这个结构刻意保持很小。agent 不需要为每种来源学习一套新 schema。
+这个结构刻意保持很小。agent 不需要为每个平台学习一套新 schema。
 
 ## Stdio 集成
 
@@ -242,14 +339,30 @@ reachkit serve stdio
 可用工具：
 
 - `web_read`：`url`，可选 `max_chars`，可选 `cookie_file`，可选 `storage_state`。
+- `web_search`：`query`，可选 `limit`。
 - `rss_read`：`url`，可选 `limit`。
 - `github_read`：`repo`，可选 `path`，可选 `ref`。
 - `github_search`：`query`，可选 `limit`。
 - `youtube_transcript`：`video`，可选 `lang`，可选 `max_chars`。
+- `youtube_metadata`：`video`。
+- `youtube_search`：`query`，可选 `limit`。
 - `x_read`：`post`。
+- `x_search`：`query`，可选 `limit`。
 - `xiaohongshu_api`：`path`，可选 `query` object。
+- `xiaohongshu_read`：`path`，可选 `query` object。
 - `bilibili_read`：`video`。
+- `bilibili_search`：`query`，可选 `limit`。
+- `reddit_read`：`target`，可选 `limit`。
+- `reddit_search`：`query`，可选 `limit`。
+- `v2ex_read`：`target`，可选 `limit`。
+- `podcast_read`：`url`，可选 `limit`。
+- `xueqiu_quote`：`symbol`。
+- `xueqiu_hot`：可选 `limit`。
 - `browser_read`：`url`，可选 `storage_state`，可选 `wait_until`，可选 `max_chars`。
+- `channels_list`：无参数。
+- `channels_doctor`：可选 `channel`。
+- `auth_status`：无参数。
+- `setup_plan`：无参数。
 
 `examples/stdio-request.jsonl` 里有一组小型请求样例。
 
@@ -277,9 +390,30 @@ export XHS_APP_KEY=your_key
 export XHS_APP_SECRET=your_secret
 ```
 
-YouTube 字幕读取使用公开视频公开 timed text。有些视频不会公开字幕轨道。
+YouTube 字幕读取使用公开视频公开 timed text。有些视频不会公开字幕轨道。YouTube 搜索需要 `YOUTUBE_API_KEY`。
 
-Bilibili 视频读取获取 BV id 对应的公开视频元数据。
+Web 搜索需要 `REACHKIT_WEB_SEARCH_URL`，它应指向一个接受 `q` 和 `limit` query 参数的 JSON endpoint。YouTube 元数据读取与 YouTube 搜索使用同一个 `YOUTUBE_API_KEY` 设置。
+
+Bilibili 视频读取和搜索使用可访问的公开元数据路径。
+
+Reddit、V2EX、播客、LinkedIn 公开页面和许多雪球读取使用公开路径。部分雪球页面可能需要用户显式提供 cookie 文件。
+
+Facebook 和 Instagram 使用 Graph API，需要显式 token：
+
+```powershell
+$env:FACEBOOK_ACCESS_TOKEN = "your_token_here"
+$env:INSTAGRAM_ACCESS_TOKEN = "your_token_here"
+```
+
+ReachKit 配置只保存环境变量名和显式文件路径：
+
+```bash
+reachkit auth set github --token-env GITHUB_TOKEN
+reachkit auth set browser --storage-state storage-state.json
+reachkit auth set web --cookie-file cookies.json
+```
+
+token 值在运行时从环境变量读取，默认不会写入 `~/.reachkit/config.toml`。
 
 URL 读取可以用 `--cookie-file` 或 `--storage-state` 显式传入 cookie 输入。ReachKit 读取用户提供的 JSON cookie list、Netscape cookie file 或 Playwright storage state file。这类文件不应该提交到 Git。
 

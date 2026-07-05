@@ -144,3 +144,85 @@ class GitHubReader:
 
     def search_repositories(self, query: str, limit: int = DEFAULT_LIMIT) -> SourceResult:
         return self.search(query, limit=limit)
+
+    def read_issue(self, repo: str, number: int) -> SourceResult:
+        owner, name = parse_repo_spec(repo)
+        url = f"https://api.github.com/repos/{quote(owner)}/{quote(name)}/issues/{number}"
+        response = (self._fetcher or fetch_text)(url, headers=_headers())
+        data = _load_json(response)
+        if not isinstance(data, dict):
+            raise ParseError("GitHub issue response was not an object")
+        title = str(data.get("title") or f"Issue {number}")
+        html_url = str(data.get("html_url") or f"https://github.com/{owner}/{name}/issues/{number}")
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        lines = [title]
+        if data.get("body"):
+            lines.append(str(data.get("body")))
+        if data.get("state"):
+            lines.append(f"state: {data.get('state')}")
+        if user.get("login"):
+            lines.append(f"author: {user.get('login')}")
+        item = RetrievedItem(
+            title=title,
+            url=html_url,
+            text=compact_text("\n".join(lines)),
+            metadata={"number": data.get("number"), "state": data.get("state"), "author": user.get("login")},
+        )
+        return SourceResult(self.name, html_url, title, response.headers.get("Content-Type"), [item], [])
+
+    def read_pull_request(self, repo: str, number: int) -> SourceResult:
+        owner, name = parse_repo_spec(repo)
+        url = f"https://api.github.com/repos/{quote(owner)}/{quote(name)}/pulls/{number}"
+        response = (self._fetcher or fetch_text)(url, headers=_headers())
+        data = _load_json(response)
+        if not isinstance(data, dict):
+            raise ParseError("GitHub pull request response was not an object")
+        title = str(data.get("title") or f"Pull request {number}")
+        html_url = str(data.get("html_url") or f"https://github.com/{owner}/{name}/pull/{number}")
+        user = data.get("user") if isinstance(data.get("user"), dict) else {}
+        base = data.get("base") if isinstance(data.get("base"), dict) else {}
+        head = data.get("head") if isinstance(data.get("head"), dict) else {}
+        lines = [title]
+        if data.get("body"):
+            lines.append(str(data.get("body")))
+        if data.get("state"):
+            lines.append(f"state: {data.get('state')}")
+        if base.get("ref") or head.get("ref"):
+            lines.append(f"branch: {head.get('ref')} -> {base.get('ref')}")
+        item = RetrievedItem(
+            title=title,
+            url=html_url,
+            text=compact_text("\n".join(lines)),
+            metadata={
+                "number": data.get("number"),
+                "state": data.get("state"),
+                "author": user.get("login"),
+                "base": base.get("ref"),
+                "head": head.get("ref"),
+            },
+        )
+        return SourceResult(self.name, html_url, title, response.headers.get("Content-Type"), [item], [])
+
+    def read_release(self, repo: str, tag: str | None = None) -> SourceResult:
+        owner, name = parse_repo_spec(repo)
+        if tag:
+            url = f"https://api.github.com/repos/{quote(owner)}/{quote(name)}/releases/tags/{quote(tag)}"
+        else:
+            url = f"https://api.github.com/repos/{quote(owner)}/{quote(name)}/releases/latest"
+        response = (self._fetcher or fetch_text)(url, headers=_headers())
+        data = _load_json(response)
+        if not isinstance(data, dict):
+            raise ParseError("GitHub release response was not an object")
+        tag_name = str(data.get("tag_name") or tag or "latest")
+        title = str(data.get("name") or tag_name)
+        html_url = str(data.get("html_url") or f"https://github.com/{owner}/{name}/releases/tag/{tag_name}")
+        lines = [title, f"tag: {tag_name}"]
+        if data.get("body"):
+            lines.append(str(data.get("body")))
+        item = RetrievedItem(
+            title=title,
+            url=html_url,
+            text=compact_text("\n".join(lines)),
+            metadata={"tag_name": tag_name, "draft": data.get("draft"), "prerelease": data.get("prerelease")},
+        )
+        return SourceResult(self.name, html_url, title, response.headers.get("Content-Type"), [item], [])

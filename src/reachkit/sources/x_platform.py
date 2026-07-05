@@ -93,3 +93,61 @@ class XPostReader:
             if isinstance(user, dict) and user.get("id") == author_id:
                 return {"username": user.get("username"), "name": user.get("name")}
         return {"username": None, "name": None}
+
+    def search(self, query: str, limit: int = 10) -> SourceResult:
+        return self._tweet_list(
+            "https://api.x.com/2/tweets/search/recent?"
+            + urlencode({"query": query, "max_results": max(10, min(limit, 100)), "tweet.fields": "author_id,created_at,lang,public_metrics"}),
+            f"X search: {query}",
+            limit=limit,
+        )
+
+    def thread(self, post: str, limit: int = 10) -> SourceResult:
+        post_id = parse_post_id(post)
+        query = f"conversation_id:{post_id}"
+        return self._tweet_list(
+            "https://api.x.com/2/tweets/search/recent?"
+            + urlencode({"query": query, "max_results": max(10, min(limit, 100)), "tweet.fields": "author_id,created_at,lang,public_metrics"}),
+            f"X thread: {post_id}",
+            limit=limit,
+        )
+
+    def timeline(self, username: str, limit: int = 10) -> SourceResult:
+        query = f"from:{username}"
+        return self._tweet_list(
+            "https://api.x.com/2/tweets/search/recent?"
+            + urlencode({"query": query, "max_results": max(10, min(limit, 100)), "tweet.fields": "author_id,created_at,lang,public_metrics"}),
+            f"X timeline: {username}",
+            limit=limit,
+        )
+
+    def _tweet_list(self, url: str, title: str, limit: int) -> SourceResult:
+        active_fetcher = self._fetcher or fetch_text
+        response = active_fetcher(url, headers={"Authorization": f"Bearer {_bearer_token()}"})
+        data = self._load_json(response)
+        if not isinstance(data, dict):
+            raise ParseError("X response was not an object")
+        items: list[RetrievedItem] = []
+        for record in list(data.get("data") or [])[: max(1, limit)]:
+            if not isinstance(record, dict):
+                continue
+            post_id = str(record.get("id") or "")
+            text = compact_text(str(record.get("text") or ""))
+            if not text:
+                continue
+            item_title = f"X post {post_id}" if post_id else "X post"
+            items.append(
+                RetrievedItem(
+                    title=item_title,
+                    url=f"https://x.com/i/status/{post_id}" if post_id else None,
+                    text=text,
+                    metadata={
+                        "post_id": post_id,
+                        "author_id": record.get("author_id"),
+                        "created_at": record.get("created_at"),
+                        "lang": record.get("lang"),
+                        "public_metrics": record.get("public_metrics"),
+                    },
+                )
+            )
+        return SourceResult(self.name, response.url, title, response.headers.get("Content-Type"), items, [])

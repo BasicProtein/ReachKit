@@ -4,6 +4,7 @@ from collections.abc import Callable
 import html
 from urllib.parse import parse_qs, urlencode, urlparse
 import xml.etree.ElementTree as ET
+import os
 
 from reachkit.core.errors import InputError, ParseError
 from reachkit.core.models import RetrievedItem, SourceResult
@@ -103,3 +104,114 @@ class YouTubeTranscriptReader:
         if not text:
             raise ParseError("YouTube transcript was empty")
         return text
+
+
+class YouTubeSearchReader:
+    name = "youtube"
+
+    def __init__(self, fetcher: FetchText | None = None, api_key: str | None = None) -> None:
+        self._fetcher = fetcher
+        self._api_key = api_key
+
+    def search(self, query: str, limit: int = 10) -> SourceResult:
+        api_key = self._api_key or os.environ.get("YOUTUBE_API_KEY")
+        if not api_key:
+            raise InputError("YOUTUBE_API_KEY is required for YouTube search")
+        active_limit = max(1, min(limit, 25))
+        params = {
+            "part": "snippet",
+            "type": "video",
+            "q": query,
+            "maxResults": active_limit,
+            "key": api_key,
+        }
+        url = "https://www.googleapis.com/youtube/v3/search?" + urlencode(params)
+        response = (self._fetcher or fetch_text)(url)
+        try:
+            data = json_loads(response.body)
+        except ValueError as exc:
+            raise ParseError("YouTube search response was not valid JSON") from exc
+        items: list[RetrievedItem] = []
+        for record in list(data.get("items") or [])[:active_limit]:
+            if not isinstance(record, dict):
+                continue
+            snippet = record.get("snippet") if isinstance(record.get("snippet"), dict) else {}
+            video_id = record.get("id", {}).get("videoId") if isinstance(record.get("id"), dict) else None
+            title = html.unescape(str(snippet.get("title") or video_id or "YouTube video"))
+            video_url = f"https://www.youtube.com/watch?v={video_id}" if video_id else None
+            lines = [title]
+            if snippet.get("description"):
+                lines.append(str(snippet.get("description")))
+            if snippet.get("channelTitle"):
+                lines.append(f"channel: {snippet.get('channelTitle')}")
+            items.append(
+                RetrievedItem(
+                    title=title,
+                    url=video_url,
+                    text=compact_text("\n".join(lines)),
+                    metadata={
+                        "video_id": video_id,
+                        "channel": snippet.get("channelTitle"),
+                        "published_at": snippet.get("publishedAt"),
+                    },
+                )
+            )
+        return SourceResult(self.name, url, f"YouTube search: {query}", response.headers.get("Content-Type"), items, [])
+
+
+class YouTubeMetadataReader:
+    name = "youtube"
+
+    def __init__(self, fetcher: FetchText | None = None, api_key: str | None = None) -> None:
+        self._fetcher = fetcher
+        self._api_key = api_key
+
+    def read(self, video: str) -> SourceResult:
+        video_id = parse_video_id(video)
+        api_key = self._api_key or os.environ.get("YOUTUBE_API_KEY")
+        if not api_key:
+            raise InputError("YOUTUBE_API_KEY is required for YouTube metadata")
+        params = {
+            "part": "snippet,contentDetails,statistics",
+            "id": video_id,
+            "key": api_key,
+        }
+        url = "https://www.googleapis.com/youtube/v3/videos?" + urlencode(params)
+        response = (self._fetcher or fetch_text)(url)
+        try:
+            data = json_loads(response.body)
+        except ValueError as exc:
+            raise ParseError("YouTube metadata response was not valid JSON") from exc
+        records = data.get("items") if isinstance(data, dict) else []
+        record = records[0] if records else {}
+        if not isinstance(record, dict):
+            raise ParseError("YouTube metadata response did not contain a video")
+        snippet = record.get("snippet") if isinstance(record.get("snippet"), dict) else {}
+        details = record.get("contentDetails") if isinstance(record.get("contentDetails"), dict) else {}
+        stats = record.get("statistics") if isinstance(record.get("statistics"), dict) else {}
+        title = html.unescape(str(snippet.get("title") or video_id))
+        watch_url = f"https://www.youtube.com/watch?v={video_id}"
+        lines = [title]
+        if snippet.get("description"):
+            lines.append(str(snippet.get("description")))
+        if snippet.get("channelTitle"):
+            lines.append(f"channel: {snippet.get('channelTitle')}")
+        item = RetrievedItem(
+            title=title,
+            url=watch_url,
+            text=compact_text("\n".join(lines)),
+            metadata={
+                "video_id": video_id,
+                "channel": snippet.get("channelTitle"),
+                "published_at": snippet.get("publishedAt"),
+                "duration": details.get("duration"),
+                "views": stats.get("viewCount"),
+            },
+        )
+        return SourceResult(self.name, watch_url, title, response.headers.get("Content-Type"), [item], [])
+
+
+def json_loads(text: str):
+    import json
+
+    return json.loads(text)

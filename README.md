@@ -7,73 +7,99 @@
   <a href="docs/README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
 </p>
 
-ReachKit is a Python CLI and library for giving AI agents clean, predictable access to public web pages, RSS or Atom feeds, GitHub content, YouTube transcripts, X posts, Xiaohongshu open API JSON, and Bilibili video metadata.
+ReachKit gives AI agents a clean internet intake layer: read pages and feeds, inspect GitHub, pull transcripts and metadata, search supported platforms, and return small JSON records an agent can actually use.
 
-It is built for agent workflows that need retrieval without a browser session, login flow, crawler farm, or paid search stack. Give it a public URL, feed, repository, file path, GitHub search query, YouTube video, X post id, Xiaohongshu open API path, or Bilibili video id. ReachKit returns normalized text records with stable JSON fields that an agent can inspect, cite, store, rank, or pass into another tool.
+Agents are good at reasoning, but they are brittle at retrieval. A raw webpage is noisy. A platform API may need a token. A transcript might exist only when the video exposes timed text. A one-off script may print logs where JSON should be. ReachKit turns those messy edges into predictable CLI commands, stdio tools, provider diagnostics, and explicit setup guidance.
 
-## Why ReachKit exists
+It is built for workflows that need public or explicitly authorized content without hidden browser extraction, login automation, crawler farms, proxy machinery, or silent credential collection. Give it a URL, feed, repository, file path, platform query, post id, stock symbol, podcast feed, or authorized API target. ReachKit returns normalized text records with stable fields that an agent can inspect, cite, store, rank, or pass into another tool.
 
-AI agents keep running into the same retrieval problems:
+## Why Agents Need This
 
-- Search snippets are too thin for reasoning. Agents need page text, feed entries, repository metadata, and file contents, not just a title and URL.
-- Web content arrives in different shapes. HTML, plain text, RSS, Atom, and GitHub API payloads all need different parsing before an agent can use them.
-- Browser automation is heavy for simple public content. Many jobs only need HTTP, text cleanup, and predictable output.
-- Ad hoc scripts are hard to trust. One command prints prose, another prints partial JSON, another mixes warnings into stdout.
-- Agent tool calls need contracts. A tool that sometimes returns text, sometimes crashes, and sometimes prints logs is painful to chain.
-- Public repositories are part of research. Agents often need README files, repository summaries, language, stars, default branches, and search results from GitHub.
-- Local diagnostics matter. A missing GitHub token, a broken HTTPS runtime, or a non UTF-8 console can waste an entire run.
+AI agents do not fail only because a model is weak. They fail because the input layer is unreliable:
 
-ReachKit focuses on the boring but important layer between "the agent needs public context" and "the agent can reason over clean text".
+- A search result says a page exists, but the agent still needs the page body before it can reason.
+- A feed, GitHub response, transcript, and social post all arrive in different shapes.
+- A missing token or local dependency can waste a whole run if the agent discovers it late.
+- Browser automation is too heavy when the task only needs HTTP, parsing, and clean output.
+- Shell snippets are hard to chain when warnings, logs, and data all share stdout.
+- Credentials are risky when tools silently read browser profiles or store token values.
 
-## Where it fits
+ReachKit handles the input step before reasoning starts: fetch, normalize, warn, and tell the agent what is ready.
 
-There are strong hosted APIs for web search, crawling, JavaScript rendering, Markdown extraction, ranking, and managed research. ReachKit is for the smaller local job that still has to be dependable:
+## Where It Fits
 
-- You already know the public URL, feed, repository, or GitHub query you want to read.
-- You want a Python command that can run in CI, local scripts, or an agent sandbox.
-- You need stdout to stay machine-readable so another tool can parse it.
-- You prefer explicit warnings and typed errors over silent partial output.
-- You want public GitHub metadata and text files in the same retrieval path as web pages and feeds.
-- You need a low-setup input stage for RAG, summarization, monitoring, or developer research.
+Use ReachKit when you want a local, inspectable retrieval layer rather than a hosted crawler or a pile of scripts:
 
-In short: use ReachKit when the hard part is not ranking the whole web, but turning known public sources into clean records that agents can trust.
+- You already know a URL, feed, repository, video, post, stock symbol, or platform query.
+- You need stable JSON for an agent loop, RAG ingestion, CI check, or monitoring job.
+- You want one result shape across web pages, feeds, GitHub, transcripts, posts, and platform searches.
+- You need `doctor` output that says what works, what needs config, and what to do next.
+- You prefer explicit environment variables and user-supplied files over hidden session scraping.
+- You want the simple path first, with optional rendered-page reads only when you choose them.
 
-## What it does
+ReachKit is not trying to rank the whole internet. It turns known public or explicitly authorized sources into records an agent can trust.
+
+## What You Can Do In Five Minutes
+
+```bash
+reachkit setup plan
+reachkit channels doctor
+reachkit read url https://example.com --format json
+reachkit read github owner/repo --path README.md --format json
+reachkit serve stdio
+```
+
+That gives an agent a quick readiness map, a web reader, a GitHub reader, and a stdio tool server without teaching it a new schema for every source.
+
+## What It Does
+
+| User pain | ReachKit path |
+| --- | --- |
+| "The agent has a URL but needs usable text." | `reachkit read url`, RSS, podcast feed, and optional rendered-page readers. |
+| "The agent needs code and project context." | GitHub repo, file, repository search, issue, pull request, and release readers. |
+| "The agent needs platform content in the same shape." | YouTube, X, Xiaohongshu, Bilibili, Reddit, V2EX, LinkedIn, Xueqiu, Facebook, and Instagram readers/searchers. |
+| "The run failed because setup was missing." | `setup plan`, `channels doctor`, `auth status`, and fix messages. |
+| "The agent runtime wants tools, not prose." | `reachkit serve stdio` with `tools/list` and `tools/call`. |
+| "Credentials must stay explicit." | Config stores env var names and user-supplied file paths, not token values. |
 
 ReachKit currently supports:
 
+- Setup planning, local config creation, update guidance, and removal with dry-run and safe modes.
+- Channel diagnostics that describe platform capabilities, provider readiness, missing configuration, and suggested fixes.
+- Local auth configuration that stores environment variable names and explicit cookie or storage-state paths, not token values.
 - Public URL reading for `text/html`, `text/plain`, and other readable `text/*` responses.
 - Explicit cookie input for URL reads, using JSON cookie lists, Netscape cookie files, or Playwright storage state files supplied by the user.
 - HTML title extraction and readable text cleanup using the Python standard library.
 - RSS and Atom feed parsing with normalized entry metadata.
-- GitHub repository metadata through the public GitHub REST API.
-- GitHub file reading through the contents API, including base64 text files.
-- GitHub repository search with stable item fields.
-- YouTube public transcript reading when timed text is available.
-- X post reading through the official API with `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN`.
-- Xiaohongshu open API JSON reading with `XHS_APP_KEY` and `XHS_APP_SECRET`.
-- Bilibili public video metadata reading for BV video ids.
+- GitHub repository metadata, file reading, repository search, issues, pull requests, and releases.
+- YouTube public transcript reading when timed text is available, plus YouTube metadata and search with an explicit API key.
+- X post reading, search, thread-style conversation lookup, and timeline-style query results through the official API with `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN`.
+- Xiaohongshu open API JSON, note search, note detail, and comments with `XHS_APP_KEY` and `XHS_APP_SECRET`.
+- Bilibili public video metadata and public video search.
+- Reddit public search, post, and comment JSON reads.
+- V2EX hot topics, node topics, topic detail with replies, and user records.
+- Podcast RSS metadata and episode records.
+- LinkedIn public page text reads.
+- Xueqiu quote, stock search, and hot-list records.
+- Facebook and Instagram Graph API records when the user supplies explicit access tokens.
 - Optional rendered page reading through `reachkit[browser]` for pages the user can access.
-- A `doctor` command for Python version, UTF-8 I/O, HTTPS runtime, GitHub token, and network checks.
 - A newline-delimited JSON stdio server for agent tool integration.
 - Text and JSON output from content commands.
 
-ReachKit does not try to be a full web crawler. It does not use browser sessions, read browser profiles, solve access challenges, operate proxy pools, or work with login-only pages unless the user explicitly supplies a cookie file for a URL read.
+ReachKit does not try to be a full web crawler. It does not read browser profiles, solve access challenges, operate proxy pools, spoof fingerprints, or silently collect login state. Authenticated paths require explicit environment variables, cookie files, storage-state files, or official API tokens supplied by the user.
 
-## Good fits
+## Good Fits
 
 ReachKit is useful when you are building:
 
-- AI agent tools that need public web page text.
-- Workflows that need YouTube transcript text, X post text, Xiaohongshu open API JSON, or Bilibili video metadata in the same JSON shape as other sources.
-- Retrieval workflows for README files, docs pages, and release feeds.
-- Research assistants that read RSS or Atom feeds before summarizing.
-- GitHub repository discovery tools for developer agents.
-- Local command-line pipelines that need deterministic JSON.
-- Stdio tools for agent runtimes that expect request and response objects.
-- Lightweight RAG ingestion scripts for public pages and feeds.
-- CI checks that monitor public docs, changelogs, feeds, or GitHub files.
-- Developer research scripts that need web, feed, and repository context without a browser.
+- AI agent tools that need public web page text instead of thin snippets.
+- Research assistants that collect sources before summarizing or comparing claims.
+- RAG ingestion scripts that need predictable records before chunking and embedding.
+- Developer agents that inspect README files, docs pages, releases, issues, and repositories.
+- Monitoring jobs that watch feeds, changelogs, docs, or public platform records.
+- Local command-line pipelines where stdout must stay parseable.
+- Agent runtimes that prefer request/response tools over handwritten shell snippets.
+- Workflows that need platform-specific content without a new schema per platform.
 
 If you need JavaScript rendering for pages you can access, use the optional browser extra. If you need large-scale crawling, challenge solving, proxy pools, or anti-abuse platform handling, ReachKit is intentionally not that layer.
 
@@ -105,6 +131,28 @@ python -m playwright install chromium
 
 ## Quick start
 
+Plan local setup before changing anything:
+
+```bash
+reachkit setup plan
+reachkit setup install --dry-run
+reachkit setup install --safe
+```
+
+Create the default local config:
+
+```bash
+reachkit setup install
+```
+
+Check platform capability status:
+
+```bash
+reachkit channels list
+reachkit channels doctor
+reachkit auth status
+```
+
 Read a public web page:
 
 ```bash
@@ -135,16 +183,43 @@ Search public GitHub repositories:
 reachkit search github "agent tools" --limit 5 --format json
 ```
 
+Search a configured web endpoint:
+
+```bash
+reachkit search web "agent tools" --limit 5 --format json
+```
+
+Read GitHub issues, pull requests, and releases:
+
+```bash
+reachkit read github owner/repo --issue 7 --format json
+reachkit read github owner/repo --pull-request 3 --format json
+reachkit read github owner/repo --release v1.0.0 --format json
+```
+
 Read a YouTube transcript when public timed text is available:
 
 ```bash
 reachkit read youtube dQw4w9WgXcQ --lang en --format json
+reachkit read youtube dQw4w9WgXcQ --metadata --format json
+```
+
+Search YouTube with an explicit API key:
+
+```bash
+reachkit search youtube "agent tools" --limit 5 --format json
 ```
 
 Read an X post through the official API:
 
 ```bash
 reachkit read x 1234567890 --format json
+```
+
+Search X through the official API:
+
+```bash
+reachkit search x "agent tools" --limit 5 --format json
 ```
 
 Read Xiaohongshu open API JSON with configured app credentials:
@@ -158,6 +233,28 @@ Read public Bilibili video metadata by BV id or av id:
 ```bash
 reachkit read bilibili BV1xx411c7mD --format json
 reachkit read bilibili av123456 --format json
+```
+
+Search Bilibili:
+
+```bash
+reachkit search bilibili "agent tools" --limit 5 --format json
+```
+
+Read other public or explicit-token sources:
+
+```bash
+reachkit read reddit https://www.reddit.com/r/example/comments/abc/title/ --format json
+reachkit search reddit "agent tools" --limit 5 --format json
+reachkit read v2ex hot --limit 5 --format json
+reachkit read v2ex topic:1 --limit 5 --format json
+reachkit read podcast https://example.com/feed.xml --limit 5 --format json
+reachkit read linkedin https://www.linkedin.com/company/example/ --format json
+reachkit read xueqiu SH600000 --format json
+reachkit read xueqiu hot --limit 5 --format json
+reachkit search xueqiu "bank" --limit 5 --format json
+reachkit read facebook page_id --format json
+reachkit read instagram instagram_user_id --format json
 ```
 
 Read a URL with an explicit cookie file:
@@ -182,6 +279,13 @@ Check local readiness:
 
 ```bash
 reachkit doctor
+```
+
+Remove local setup files while keeping user config:
+
+```bash
+reachkit setup remove
+reachkit setup remove --purge
 ```
 
 Run the stdio tool server:
@@ -215,6 +319,7 @@ Content commands return plain text by default. Add `--format json` to get a stab
 Every content result has:
 
 - `source`: `web`, `rss`, `github`, `youtube`, `x`, `xiaohongshu`, or `bilibili`.
+- Newer platform readers use the same shape for `reddit`, `v2ex`, `podcast`, `linkedin`, `xueqiu`, `facebook`, and `instagram`.
 - `url`: the request URL or canonical result URL when available.
 - `title`: the page, feed, repository, search, or file title when available.
 - `content_type`: the HTTP content type when available.
@@ -242,14 +347,30 @@ Call a tool:
 Available tools:
 
 - `web_read`: `url`, optional `max_chars`, optional `cookie_file`, optional `storage_state`.
+- `web_search`: `query`, optional `limit`.
 - `rss_read`: `url`, optional `limit`.
 - `github_read`: `repo`, optional `path`, optional `ref`.
 - `github_search`: `query`, optional `limit`.
 - `youtube_transcript`: `video`, optional `lang`, optional `max_chars`.
+- `youtube_metadata`: `video`.
+- `youtube_search`: `query`, optional `limit`.
 - `x_read`: `post`.
+- `x_search`: `query`, optional `limit`.
 - `xiaohongshu_api`: `path`, optional `query` object.
+- `xiaohongshu_read`: `path`, optional `query` object.
 - `bilibili_read`: `video`.
+- `bilibili_search`: `query`, optional `limit`.
+- `reddit_read`: `target`, optional `limit`.
+- `reddit_search`: `query`, optional `limit`.
+- `v2ex_read`: `target`, optional `limit`.
+- `podcast_read`: `url`, optional `limit`.
+- `xueqiu_quote`: `symbol`.
+- `xueqiu_hot`: optional `limit`.
 - `browser_read`: `url`, optional `storage_state`, optional `wait_until`, optional `max_chars`.
+- `channels_list`: no arguments.
+- `channels_doctor`: optional `channel`.
+- `auth_status`: no arguments.
+- `setup_plan`: no arguments.
 
 See `examples/stdio-request.jsonl` for a small request set.
 
@@ -277,9 +398,30 @@ export XHS_APP_KEY=your_key
 export XHS_APP_SECRET=your_secret
 ```
 
-YouTube transcript reading uses public timed text when a transcript track is available. Some videos do not expose public timed text.
+YouTube transcript reading uses public timed text when a transcript track is available. YouTube search requires `YOUTUBE_API_KEY`.
 
-Bilibili video reading fetches public metadata for BV ids.
+Web search requires `REACHKIT_WEB_SEARCH_URL`, which should point to a JSON endpoint that accepts `q` and `limit` query parameters. YouTube metadata uses the same `YOUTUBE_API_KEY` setting as YouTube search.
+
+Bilibili video reading and search fetch public metadata when the public endpoints are reachable.
+
+Reddit, V2EX, podcast, LinkedIn public page, and many Xueqiu reads use public endpoints. Some Xueqiu pages may require an explicit cookie file supplied by the user.
+
+Facebook and Instagram use Graph API paths and require explicit tokens:
+
+```powershell
+$env:FACEBOOK_ACCESS_TOKEN = "your_token_here"
+$env:INSTAGRAM_ACCESS_TOKEN = "your_token_here"
+```
+
+ReachKit config stores environment variable names and explicit file paths:
+
+```bash
+reachkit auth set github --token-env GITHUB_TOKEN
+reachkit auth set browser --storage-state storage-state.json
+reachkit auth set web --cookie-file cookies.json
+```
+
+Token values are read from the environment at runtime and are not written to `~/.reachkit/config.toml` by default.
 
 URL reads can use explicit cookie input with `--cookie-file` or `--storage-state`. ReachKit reads JSON cookie lists, Netscape cookie files, and Playwright storage state files supplied by the user. These files are never required for public URL reads and should stay out of Git.
 

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import Callable
 import json
 import re
+import html
 from urllib.parse import urlencode, urlparse
 
 from reachkit.core.errors import InputError, ParseError
@@ -118,3 +119,40 @@ class BilibiliVideoReader:
             return json.loads(response.body)
         except json.JSONDecodeError as exc:
             raise ParseError("Bilibili response was not valid JSON") from exc
+
+    def search(self, query: str, limit: int = 10) -> SourceResult:
+        active_limit = max(1, min(limit, 20))
+        url = "https://api.bilibili.com/x/web-interface/search/type?" + urlencode(
+            {"search_type": "video", "keyword": query, "page_size": active_limit}
+        )
+        response = (self._fetcher or fetch_text)(url)
+        payload = self._load_json(response)
+        if not isinstance(payload, dict):
+            raise ParseError("Bilibili search response was not an object")
+        if payload.get("code") != 0:
+            raise ParseError(str(payload.get("message") or "Bilibili search failed"))
+        data = payload.get("data") if isinstance(payload.get("data"), dict) else {}
+        records = list(data.get("result") or [])[:active_limit]
+        items: list[RetrievedItem] = []
+        for record in records:
+            if not isinstance(record, dict):
+                continue
+            title = compact_text(re.sub("<[^>]+>", "", html.unescape(str(record.get("title") or "Bilibili video"))))
+            bvid = record.get("bvid")
+            item_url = record.get("arcurl") or (f"https://www.bilibili.com/video/{bvid}" if bvid else None)
+            lines = [title]
+            if record.get("description"):
+                lines.append(str(record.get("description")))
+            if record.get("author"):
+                lines.append(f"creator: {record.get('author')}")
+            if record.get("play") is not None:
+                lines.append(f"views: {record.get('play')}")
+            items.append(
+                RetrievedItem(
+                    title=title,
+                    url=item_url,
+                    text=compact_text("\n".join(lines)),
+                    metadata={"bvid": bvid, "author": record.get("author"), "views": record.get("play")},
+                )
+            )
+        return SourceResult(self.name, url, f"Bilibili search: {query}", response.headers.get("Content-Type"), items, [])

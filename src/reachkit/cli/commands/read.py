@@ -6,12 +6,19 @@ from reachkit.core.formatting import to_json_text, to_plain_text
 from reachkit.runtime.limits import DEFAULT_LIMIT, DEFAULT_MAX_CHARS, MAX_CHARS_LIMIT, MAX_LIMIT
 from reachkit.sources.bilibili import BilibiliVideoReader
 from reachkit.sources.browser import BrowserReader
+from reachkit.sources.facebook import FacebookGraphReader
 from reachkit.sources.github import GitHubReader
+from reachkit.sources.instagram import InstagramGraphReader
+from reachkit.sources.linkedin import LinkedInPublicReader
+from reachkit.sources.podcast import PodcastReader
+from reachkit.sources.reddit import RedditReader
 from reachkit.sources.rss import RssReader
+from reachkit.sources.v2ex import V2EXReader
 from reachkit.sources.web import WebReader
 from reachkit.sources.x_platform import XPostReader
 from reachkit.sources.xiaohongshu import XiaohongshuApiReader
-from reachkit.sources.youtube import YouTubeTranscriptReader
+from reachkit.sources.xueqiu import XueqiuReader
+from reachkit.sources.youtube import YouTubeMetadataReader, YouTubeTranscriptReader
 
 
 def _format_result(result, output_format: str) -> str:
@@ -56,13 +63,26 @@ def handle_read_rss(args: argparse.Namespace) -> int:
 
 
 def handle_read_github(args: argparse.Namespace) -> int:
-    result = GitHubReader().read(repo=args.repo, path=args.path, ref=args.ref)
+    reader = GitHubReader()
+    if args.issue is not None:
+        result = reader.read_issue(args.repo, args.issue)
+    elif args.pull_request is not None:
+        result = reader.read_pull_request(args.repo, args.pull_request)
+    elif args.release is not None:
+        result = reader.read_release(args.repo, tag=args.release)
+    elif args.latest_release:
+        result = reader.read_release(args.repo)
+    else:
+        result = reader.read(repo=args.repo, path=args.path, ref=args.ref)
     print(_format_result(result, args.format), end="")
     return 0
 
 
 def handle_read_youtube(args: argparse.Namespace) -> int:
-    result = YouTubeTranscriptReader().read(video=args.video, lang=args.lang, max_chars=args.max_chars)
+    if args.metadata:
+        result = YouTubeMetadataReader().read(video=args.video)
+    else:
+        result = YouTubeTranscriptReader().read(video=args.video, lang=args.lang, max_chars=args.max_chars)
     print(_format_result(result, args.format), end="")
     return 0
 
@@ -92,6 +112,51 @@ def handle_read_browser(args: argparse.Namespace) -> int:
         wait_until=args.wait_until,
         max_chars=args.max_chars,
     )
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_v2ex(args: argparse.Namespace) -> int:
+    result = V2EXReader().read(args.target, limit=args.limit)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_podcast(args: argparse.Namespace) -> int:
+    result = PodcastReader().read(args.url, limit=args.limit)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_reddit(args: argparse.Namespace) -> int:
+    result = RedditReader().read(args.target, limit=args.limit)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_linkedin(args: argparse.Namespace) -> int:
+    result = LinkedInPublicReader().read(args.target)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_xueqiu(args: argparse.Namespace) -> int:
+    if args.target == "hot":
+        result = XueqiuReader().hot(limit=args.limit)
+    else:
+        result = XueqiuReader().read(args.target)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_facebook(args: argparse.Namespace) -> int:
+    result = FacebookGraphReader().read(args.target)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_instagram(args: argparse.Namespace) -> int:
+    result = InstagramGraphReader().read(args.target)
     print(_format_result(result, args.format), end="")
     return 0
 
@@ -132,6 +197,10 @@ def add_read_parser(subparsers) -> None:
     github_parser.add_argument("repo")
     github_parser.add_argument("--path")
     github_parser.add_argument("--ref")
+    github_parser.add_argument("--issue", type=int)
+    github_parser.add_argument("--pull-request", type=int)
+    github_parser.add_argument("--release")
+    github_parser.add_argument("--latest-release", action="store_true")
     github_parser.add_argument("--format", choices=["text", "json"], default="text")
     github_parser.set_defaults(handler=handle_read_github)
 
@@ -139,6 +208,7 @@ def add_read_parser(subparsers) -> None:
     youtube_parser.add_argument("video")
     youtube_parser.add_argument("--lang", default="en")
     youtube_parser.add_argument("--max-chars", type=bounded_max_chars, default=DEFAULT_MAX_CHARS)
+    youtube_parser.add_argument("--metadata", action="store_true")
     youtube_parser.add_argument("--format", choices=["text", "json"], default="text")
     youtube_parser.set_defaults(handler=handle_read_youtube)
 
@@ -165,3 +235,42 @@ def add_read_parser(subparsers) -> None:
     browser_parser.add_argument("--max-chars", type=bounded_max_chars, default=DEFAULT_MAX_CHARS)
     browser_parser.add_argument("--format", choices=["text", "json"], default="text")
     browser_parser.set_defaults(handler=handle_read_browser)
+
+    v2ex_parser = read_subparsers.add_parser("v2ex", help="Read public V2EX topics or users.")
+    v2ex_parser.add_argument("target")
+    v2ex_parser.add_argument("--limit", type=bounded_limit, default=DEFAULT_LIMIT)
+    v2ex_parser.add_argument("--format", choices=["text", "json"], default="text")
+    v2ex_parser.set_defaults(handler=handle_read_v2ex)
+
+    podcast_parser = read_subparsers.add_parser("podcast", help="Read podcast RSS episode metadata.")
+    podcast_parser.add_argument("url")
+    podcast_parser.add_argument("--limit", type=bounded_limit, default=DEFAULT_LIMIT)
+    podcast_parser.add_argument("--format", choices=["text", "json"], default="text")
+    podcast_parser.set_defaults(handler=handle_read_podcast)
+
+    reddit_parser = read_subparsers.add_parser("reddit", help="Read public Reddit posts and comments.")
+    reddit_parser.add_argument("target")
+    reddit_parser.add_argument("--limit", type=bounded_limit, default=DEFAULT_LIMIT)
+    reddit_parser.add_argument("--format", choices=["text", "json"], default="text")
+    reddit_parser.set_defaults(handler=handle_read_reddit)
+
+    linkedin_parser = read_subparsers.add_parser("linkedin", help="Read a public LinkedIn page.")
+    linkedin_parser.add_argument("target")
+    linkedin_parser.add_argument("--format", choices=["text", "json"], default="text")
+    linkedin_parser.set_defaults(handler=handle_read_linkedin)
+
+    xueqiu_parser = read_subparsers.add_parser("xueqiu", help="Read a Xueqiu stock quote.")
+    xueqiu_parser.add_argument("target")
+    xueqiu_parser.add_argument("--limit", type=bounded_limit, default=DEFAULT_LIMIT)
+    xueqiu_parser.add_argument("--format", choices=["text", "json"], default="text")
+    xueqiu_parser.set_defaults(handler=handle_read_xueqiu)
+
+    facebook_parser = read_subparsers.add_parser("facebook", help="Read Facebook Graph API page data with an explicit token.")
+    facebook_parser.add_argument("target")
+    facebook_parser.add_argument("--format", choices=["text", "json"], default="text")
+    facebook_parser.set_defaults(handler=handle_read_facebook)
+
+    instagram_parser = read_subparsers.add_parser("instagram", help="Read Instagram Graph API profile data with an explicit token.")
+    instagram_parser.add_argument("target")
+    instagram_parser.add_argument("--format", choices=["text", "json"], default="text")
+    instagram_parser.set_defaults(handler=handle_read_instagram)

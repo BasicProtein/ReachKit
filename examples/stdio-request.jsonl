@@ -5,4 +5,18 @@
 {"id":"5","method":"tools/call","params":{"name":"xiaohongshu_api","arguments":{"path":"/api/open/path"}}}
 {"id":"6","method":"tools/call","params":{"name":"bilibili_read","arguments":{"video":"BV1xx411c7mD"}}}
 {"id":"7","method":"tools/call","params":{"name":"browser_read","arguments":{"url":"https://example.com","storage_state":"storage-state.json","max_chars":2000}}}
-{"id":"8","method":"tools/call","params":{"name":"missing_tool","arguments":{}}}
+{"id":"8","method":"tools/call","params":{"name":"channels_list","arguments":{}}}
+{"id":"9","method":"tools/call","params":{"name":"channels_doctor","arguments":{"channel":"github"}}}
+{"id":"10","method":"tools/call","params":{"name":"auth_status","arguments":{}}}
+{"id":"11","method":"tools/call","params":{"name":"setup_plan","arguments":{}}}
+{"id":"12","method":"tools/call","params":{"name":"youtube_search","arguments":{"query":"agent tools","limit":3}}}
+{"id":"13","method":"tools/call","params":{"name":"bilibili_search","arguments":{"query":"agent tools","limit":3}}}
+{"id":"14","method":"tools/call","params":{"name":"reddit_read","arguments":{"target":"https://www.reddit.com/r/example/comments/abc/title/","limit":5}}}
+{"id":"15","method":"tools/call","params":{"name":"x_search","arguments":{"query":"agent tools","limit":5}}}
+{"id":"16","method":"tools/call","params":{"name":"xueqiu_quote","arguments":{"symbol":"SH600000"}}}
+{"id":"17","method":"tools/call","params":{"name":"web_search","arguments":{"query":"agent tools","limit":3}}}
+{"id":"18","method":"tools/call","params":{"name":"youtube_metadata","arguments":{"video":"dQw4w9WgXcQ"}}}
+{"id":"19","method":"tools/call","params":{"name":"v2ex_read","arguments":{"target":"topic:1","limit":5}}}
+{"id":"20","method":"tools/call","params":{"name":"podcast_read","arguments":{"url":"https://example.com/feed.xml","limit":3}}}
+{"id":"21","method":"tools/call","params":{"name":"xueqiu_hot","arguments":{"limit":5}}}
+{"id":"22","method":"tools/call","params":{"name":"missing_tool","arguments":{}}}
