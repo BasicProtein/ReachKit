@@ -1,4 +1,6 @@
-docs/
+docs/Code-Trace-Constraint.md
+docs/File-Architecture.md
+docs/Implementation-Plan.md
 .venv*/
 
 __pycache__/

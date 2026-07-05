@@ -1,5 +1,12 @@
 # ReachKit
 
+<p align="center">
+  <a href="docs/README.zh-CN.md"><img alt="中文" src="https://img.shields.io/badge/README-%E4%B8%AD%E6%96%87-2f81f7?style=flat-square"></a>
+  <a href="README.md"><img alt="English" src="https://img.shields.io/badge/README-English-2f81f7?style=flat-square"></a>
+  <a href="docs/README.ja.md"><img alt="日本語" src="https://img.shields.io/badge/README-%E6%97%A5%E6%9C%AC%E8%AA%9E-2f81f7?style=flat-square"></a>
+  <a href="docs/README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
+</p>
+
 ReachKit is a Python CLI and library for giving AI agents clean, predictable access to public web pages, RSS or Atom feeds, and GitHub content.
 
 It is built for agent workflows that need retrieval without a browser session, login flow, crawler farm, or paid search stack. Give it a public URL, feed, repository, file path, or GitHub search query. ReachKit returns normalized text records with stable JSON fields that an agent can inspect, cite, store, rank, or pass into another tool.
