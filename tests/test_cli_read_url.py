@@ -36,7 +36,7 @@ def test_read_url_outputs_text(monkeypatch, capsys):
     captured = capsys.readouterr()
     assert exit_code == 0
     assert "Hello World" in captured.out
-    assert reader.calls == [{"url": "https://example.com", "max_chars": 12000}]
+    assert reader.calls == [{"url": "https://example.com", "max_chars": 12000, "cookie_file": None, "storage_state": None}]
 
 
 def test_read_url_outputs_json(monkeypatch, capsys):

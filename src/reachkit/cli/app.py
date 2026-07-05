@@ -22,7 +22,7 @@ def _prefer_utf8_stdio() -> None:
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="reachkit",
-        description="ReachKit reads public web, RSS, and GitHub content.",
+        description="ReachKit reads public web, RSS, GitHub, YouTube, X, Xiaohongshu, and Bilibili content.",
     )
     parser.add_argument(
         "--version",

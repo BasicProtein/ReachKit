@@ -7,9 +7,9 @@
   <a href="README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
 </p>
 
-ReachKit은 AI agent가 공개 웹 페이지, RSS 또는 Atom feed, GitHub 콘텐츠를 안정적으로 읽을 수 있게 해 주는 Python CLI 및 라이브러리입니다.
+ReachKit은 AI agent가 공개 웹 페이지, RSS 또는 Atom feed, GitHub 콘텐츠, YouTube transcripts, X posts, Xiaohongshu open API JSON, Bilibili video metadata를 안정적으로 읽을 수 있게 해 주는 Python CLI 및 라이브러리입니다.
 
-브라우저 세션, 로그인 흐름, 크롤러 팜, 유료 검색 스택 없이 retrieval이 필요한 agent workflow를 위해 만들었습니다. 공개 URL, feed, repository, file path, GitHub search query를 넘기면 ReachKit은 안정적인 JSON 필드를 가진 normalized text records를 반환합니다. agent는 이를 확인하고, 인용하고, 저장하고, 순위를 매기거나, 다음 tool에 넘길 수 있습니다.
+브라우저 세션, 로그인 흐름, 크롤러 팜, 유료 검색 스택 없이 retrieval이 필요한 agent workflow를 위해 만들었습니다. 공개 URL, feed, repository, file path, GitHub search query, YouTube video, X post id, Bilibili video id를 넘기면 ReachKit은 안정적인 JSON 필드를 가진 normalized text records를 반환합니다. agent는 이를 확인하고, 인용하고, 저장하고, 순위를 매기거나, 다음 tool에 넘길 수 있습니다.
 
 ## ReachKit이 필요한 이유
 
@@ -43,22 +43,29 @@ Web search, crawling, JavaScript rendering, Markdown extraction, ranking, manage
 ReachKit은 현재 다음을 제공합니다.
 
 - `text/html`, `text/plain`, 기타 읽을 수 있는 `text/*` response를 가진 public URL 읽기.
+- URL reads에서 사용자가 명시적으로 제공한 JSON cookie list, Netscape cookie file, Playwright storage state file을 사용할 수 있습니다.
 - Python standard library를 사용한 HTML title extraction과 readable text cleanup.
 - RSS 및 Atom feed parsing과 normalized entry metadata.
 - public GitHub REST API를 통한 repository metadata 읽기.
 - GitHub contents API를 통한 repository text file 읽기. base64 text file도 처리합니다.
 - stable item fields를 가진 public GitHub repository search.
+- public timed text가 있는 YouTube transcript 읽기.
+- official API를 통한 X post 읽기. `X_BEARER_TOKEN` 또는 `TWITTER_BEARER_TOKEN`이 필요합니다.
+- Xiaohongshu open API JSON 읽기. `XHS_APP_KEY`와 `XHS_APP_SECRET`이 필요합니다.
+- BV video id에 대한 Bilibili public video metadata 읽기.
+- optional `reachkit[browser]`를 통한, 사용자가 access할 수 있는 rendered page text 읽기.
 - Python version, UTF-8 I/O, HTTPS runtime, GitHub token, network checks를 위한 `doctor` command.
 - agent tool integration을 위한 newline-delimited JSON stdio server.
 - content commands의 text 및 JSON output.
 
-ReachKit은 full web crawler가 아닙니다. browser sessions, cookies, login-only pages, social media scraping, audio, video, paid search APIs를 사용하지 않습니다.
+ReachKit은 full web crawler가 아닙니다. browser profile을 읽지 않고, access challenge를 처리하지 않고, proxy pool을 운영하지 않으며, login-only page를 다루지 않습니다. URL read에서 cookie를 쓰는 경우는 사용자가 cookie file을 명시적으로 제공할 때뿐입니다.
 
 ## 잘 맞는 사용처
 
 ReachKit은 다음을 만들 때 유용합니다.
 
 - public web page text가 필요한 AI agent tools.
+- YouTube transcript text, X post text, Xiaohongshu open API JSON, Bilibili video metadata를 다른 source와 같은 JSON shape로 다루는 workflows.
 - README files, docs pages, release feeds를 위한 retrieval workflows.
 - RSS 또는 Atom feeds를 읽은 뒤 요약하는 research assistants.
 - developer agents를 위한 GitHub repository discovery tools.
@@ -68,7 +75,7 @@ ReachKit은 다음을 만들 때 유용합니다.
 - public docs, changelogs, feeds, GitHub files를 monitoring하는 CI checks.
 - browser 없이 web, feed, repository context가 필요한 developer research scripts.
 
-JavaScript rendering, authenticated sites, large-scale crawling, anti-abuse platform handling이 필요하다면 ReachKit은 그 층을 담당하지 않습니다.
+사용자가 access할 수 있는 JavaScript rendered page를 읽어야 한다면 optional browser extra를 사용할 수 있습니다. large-scale crawling, access challenge handling, proxy pools, anti-abuse platform handling이 필요하다면 ReachKit은 그 층을 담당하지 않습니다.
 
 ## 설치
 
@@ -88,6 +95,13 @@ uv pip install --python .venv/Scripts/python.exe -e . pytest
 ```
 
 macOS 또는 Linux에서는 virtual environment Python path가 보통 `.venv/bin/python`입니다.
+
+Rendered page reads에는 optional browser extra와 browser runtime이 필요합니다.
+
+```bash
+python -m pip install -e ".[browser]"
+python -m playwright install chromium
+```
 
 ## Quick start
 
@@ -119,6 +133,49 @@ public GitHub repositories 검색:
 
 ```bash
 reachkit search github "agent tools" --limit 5 --format json
+```
+
+public timed text가 있는 YouTube transcript 읽기:
+
+```bash
+reachkit read youtube dQw4w9WgXcQ --lang en --format json
+```
+
+official API로 X post 읽기:
+
+```bash
+reachkit read x 1234567890 --format json
+```
+
+configured app credentials로 Xiaohongshu open API JSON 읽기:
+
+```bash
+reachkit read xiaohongshu /api/open/path --param note_id=abc --format json
+```
+
+BV id 또는 av id로 Bilibili public video metadata 읽기:
+
+```bash
+reachkit read bilibili BV1xx411c7mD --format json
+reachkit read bilibili av123456 --format json
+```
+
+명시적인 cookie file로 URL 읽기:
+
+```bash
+reachkit read url https://example.com --cookie-file cookies.json --format json
+```
+
+명시적인 Playwright storage state file로 URL 읽기:
+
+```bash
+reachkit read url https://example.com --storage-state storage-state.json --format json
+```
+
+optional browser extra로 rendered page text 읽기:
+
+```bash
+reachkit read browser https://example.com --storage-state storage-state.json --format json
 ```
 
 local readiness 확인:
@@ -157,7 +214,7 @@ Content commands는 기본적으로 plain text를 출력합니다. `--format jso
 
 모든 content result는 다음을 가집니다.
 
-- `source`: `web`, `rss`, `github`.
+- `source`: `web`, `rss`, `github`, `youtube`, `x`, `xiaohongshu`, `bilibili`.
 - `url`: request URL 또는 사용 가능한 canonical result URL.
 - `title`: page, feed, repository, search, file title.
 - `content_type`: 사용 가능한 HTTP content type.
@@ -184,24 +241,49 @@ Tool call:
 
 Available tools:
 
-- `web_read`: `url`, optional `max_chars`.
+- `web_read`: `url`, optional `max_chars`, optional `cookie_file`, optional `storage_state`.
 - `rss_read`: `url`, optional `limit`.
 - `github_read`: `repo`, optional `path`, optional `ref`.
 - `github_search`: `query`, optional `limit`.
+- `youtube_transcript`: `video`, optional `lang`, optional `max_chars`.
+- `x_read`: `post`.
+- `xiaohongshu_api`: `path`, optional `query` object.
+- `bilibili_read`: `video`.
+- `browser_read`: `url`, optional `storage_state`, optional `wait_until`, optional `max_chars`.
 
 작은 request set은 `examples/stdio-request.jsonl`에 있습니다.
 
-## GitHub access
+## Platform access
 
-ReachKit은 public GitHub REST endpoints를 사용합니다. token 없이도 실행할 수 있지만 GitHub는 unauthenticated requests에 더 엄격한 rate limit을 적용합니다.
+ReachKit은 public GitHub REST endpoints를 사용합니다. token 없이도 실행할 수 있지만 GitHub는 unauthenticated requests에 더 엄격한 rate limit을 적용합니다. limit을 높이려면 `GITHUB_TOKEN`을 설정합니다.
 
-limit을 높이려면 다음을 설정하세요.
+X post reading은 official API를 사용하며 `X_BEARER_TOKEN` 또는 `TWITTER_BEARER_TOKEN`이 필요합니다.
 
-```bash
-GITHUB_TOKEN=your_token_here
+Xiaohongshu reading은 open API path를 사용하며 `XHS_APP_KEY`와 `XHS_APP_SECRET`이 필요합니다.
+
+PowerShell에서는 command 실행 전에 credentials를 설정합니다.
+
+```powershell
+$env:X_BEARER_TOKEN = "your_token_here"
+$env:XHS_APP_KEY = "your_key"
+$env:XHS_APP_SECRET = "your_secret"
 ```
 
-이 token은 GitHub API requests의 HTTP bearer token으로만 사용됩니다.
+macOS 또는 Linux shell에서는:
+
+```bash
+export X_BEARER_TOKEN=your_token_here
+export XHS_APP_KEY=your_key
+export XHS_APP_SECRET=your_secret
+```
+
+YouTube transcript reading은 video가 public timed text track을 제공할 때 사용할 수 있습니다. 모든 video가 public transcript를 제공하지는 않습니다.
+
+Bilibili video reading은 BV id의 public metadata를 가져옵니다.
+
+URL reads는 `--cookie-file` 또는 `--storage-state`로 cookie input을 명시적으로 받을 수 있습니다. ReachKit은 사용자가 제공한 JSON cookie list, Netscape cookie file, Playwright storage state file을 읽습니다. 이런 file은 Git에 들어가면 안 됩니다.
+
+Rendered page reads는 optional browser extra를 사용합니다. 사용자가 access할 수 있는 page에 대해 명시적으로 제공된 storage state file을 사용할 수 있지만, ReachKit은 browser profile data를 추출하지 않습니다.
 
 ## Limits and behavior
 
@@ -209,6 +291,7 @@ GITHUB_TOKEN=your_token_here
 - `--max-chars` 기본값은 `12000`이고 `1`부터 `100000`까지 받을 수 있습니다.
 - `--limit` 기본값은 `10`이고 최대 `50`입니다.
 - HTTP는 `http://`와 `https://`만 사용합니다.
+- cookie file과 storage state file은 명시적으로 제공되어야 합니다. ReachKit은 browser profile storage를 읽지 않습니다.
 - 기본 HTTP timeout은 `15`초입니다.
 - 너무 큰 responses, non-2xx responses, invalid XML, invalid input, binary GitHub files는 user-facing errors를 반환합니다.
 - `doctor`는 required check가 실패할 때만 exit code `1`을 반환합니다.

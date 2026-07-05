@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "reachkit"
 version = "0.1.0"
-description = "Small retrieval toolkit for public web, RSS, and GitHub content."
+description = "Small retrieval toolkit for public web, RSS, GitHub, and platform API content."
 readme = "README.md"
 requires-python = ">=3.11"
 authors = [
@@ -13,6 +13,9 @@ authors = [
 ]
 license = { text = "Apache-2.0" }
 dependencies = []
+
+[project.optional-dependencies]
+browser = ["playwright>=1.45"]
 
 [project.scripts]
 reachkit = "reachkit.cli.app:main"

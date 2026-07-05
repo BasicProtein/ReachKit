@@ -4,9 +4,14 @@ import argparse
 
 from reachkit.core.formatting import to_json_text, to_plain_text
 from reachkit.runtime.limits import DEFAULT_LIMIT, DEFAULT_MAX_CHARS, MAX_CHARS_LIMIT, MAX_LIMIT
+from reachkit.sources.bilibili import BilibiliVideoReader
+from reachkit.sources.browser import BrowserReader
 from reachkit.sources.github import GitHubReader
 from reachkit.sources.rss import RssReader
 from reachkit.sources.web import WebReader
+from reachkit.sources.x_platform import XPostReader
+from reachkit.sources.xiaohongshu import XiaohongshuApiReader
+from reachkit.sources.youtube import YouTubeTranscriptReader
 
 
 def _format_result(result, output_format: str) -> str:
@@ -34,7 +39,12 @@ def bounded_max_chars(value: str) -> int:
 
 
 def handle_read_url(args: argparse.Namespace) -> int:
-    result = WebReader().read(url=args.url, max_chars=args.max_chars)
+    result = WebReader().read(
+        url=args.url,
+        max_chars=args.max_chars,
+        cookie_file=args.cookie_file,
+        storage_state=args.storage_state,
+    )
     print(_format_result(result, args.format), end="")
     return 0
 
@@ -51,6 +61,55 @@ def handle_read_github(args: argparse.Namespace) -> int:
     return 0
 
 
+def handle_read_youtube(args: argparse.Namespace) -> int:
+    result = YouTubeTranscriptReader().read(video=args.video, lang=args.lang, max_chars=args.max_chars)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_x(args: argparse.Namespace) -> int:
+    result = XPostReader().read(args.post)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_bilibili(args: argparse.Namespace) -> int:
+    result = BilibiliVideoReader().read(args.video)
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_xiaohongshu(args: argparse.Namespace) -> int:
+    result = XiaohongshuApiReader().read(path=args.path, query=_query_params(args.param))
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def handle_read_browser(args: argparse.Namespace) -> int:
+    result = BrowserReader().read(
+        url=args.url,
+        storage_state=args.storage_state,
+        wait_until=args.wait_until,
+        max_chars=args.max_chars,
+    )
+    print(_format_result(result, args.format), end="")
+    return 0
+
+
+def _query_params(values: list[str] | None) -> dict[str, str]:
+    params: dict[str, str] = {}
+    for key, item_value in values or []:
+        params[key] = item_value
+    return params
+
+
+def _query_param(value: str) -> tuple[str, str]:
+    key, separator, item_value = value.partition("=")
+    if not separator or not key:
+        raise argparse.ArgumentTypeError("Query parameters must use key=value format")
+    return key, item_value
+
+
 def add_read_parser(subparsers) -> None:
     read_parser = subparsers.add_parser("read", help="Read public content.")
     read_subparsers = read_parser.add_subparsers(dest="read_source", required=True)
@@ -59,6 +118,8 @@ def add_read_parser(subparsers) -> None:
     url_parser.add_argument("url")
     url_parser.add_argument("--format", choices=["text", "json"], default="text")
     url_parser.add_argument("--max-chars", type=bounded_max_chars, default=DEFAULT_MAX_CHARS)
+    url_parser.add_argument("--cookie-file")
+    url_parser.add_argument("--storage-state")
     url_parser.set_defaults(handler=handle_read_url)
 
     rss_parser = read_subparsers.add_parser("rss", help="Read an RSS or Atom feed.")
@@ -73,3 +134,34 @@ def add_read_parser(subparsers) -> None:
     github_parser.add_argument("--ref")
     github_parser.add_argument("--format", choices=["text", "json"], default="text")
     github_parser.set_defaults(handler=handle_read_github)
+
+    youtube_parser = read_subparsers.add_parser("youtube", help="Read a public YouTube transcript.")
+    youtube_parser.add_argument("video")
+    youtube_parser.add_argument("--lang", default="en")
+    youtube_parser.add_argument("--max-chars", type=bounded_max_chars, default=DEFAULT_MAX_CHARS)
+    youtube_parser.add_argument("--format", choices=["text", "json"], default="text")
+    youtube_parser.set_defaults(handler=handle_read_youtube)
+
+    x_parser = read_subparsers.add_parser("x", help="Read a public X post through the official API.")
+    x_parser.add_argument("post")
+    x_parser.add_argument("--format", choices=["text", "json"], default="text")
+    x_parser.set_defaults(handler=handle_read_x)
+
+    bilibili_parser = read_subparsers.add_parser("bilibili", help="Read public Bilibili video metadata.")
+    bilibili_parser.add_argument("video")
+    bilibili_parser.add_argument("--format", choices=["text", "json"], default="text")
+    bilibili_parser.set_defaults(handler=handle_read_bilibili)
+
+    xhs_parser = read_subparsers.add_parser("xiaohongshu", help="Read Xiaohongshu open API JSON.")
+    xhs_parser.add_argument("path")
+    xhs_parser.add_argument("--param", action="append", type=_query_param)
+    xhs_parser.add_argument("--format", choices=["text", "json"], default="text")
+    xhs_parser.set_defaults(handler=handle_read_xiaohongshu)
+
+    browser_parser = read_subparsers.add_parser("browser", help="Read rendered page text with an optional browser extra.")
+    browser_parser.add_argument("url")
+    browser_parser.add_argument("--storage-state")
+    browser_parser.add_argument("--wait-until", choices=["commit", "domcontentloaded", "load", "networkidle"], default="load")
+    browser_parser.add_argument("--max-chars", type=bounded_max_chars, default=DEFAULT_MAX_CHARS)
+    browser_parser.add_argument("--format", choices=["text", "json"], default="text")
+    browser_parser.set_defaults(handler=handle_read_browser)

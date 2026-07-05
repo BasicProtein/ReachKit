@@ -17,3 +17,10 @@ dist/
 .env
 .env.*
 *.log
+cookies.json
+cookies.txt
+*.cookies.json
+*.cookies.txt
+storage-state.json
+xhs-credentials.json
+platform-credentials.json

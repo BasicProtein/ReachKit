@@ -24,6 +24,11 @@ def test_tools_list_response_contains_expected_tools():
         "rss_read",
         "github_read",
         "github_search",
+        "youtube_transcript",
+        "x_read",
+        "bilibili_read",
+        "xiaohongshu_api",
+        "browser_read",
     ]
 
 
@@ -36,6 +41,31 @@ def test_tools_call_uses_injected_handler():
 
     assert response["ok"] is True
     assert response["result"]["items"][0]["text"] == "Hello"
+
+
+def test_tools_call_passes_cookie_file_to_web_handler():
+    seen = []
+    server = StdioServer(web_read=lambda arguments: seen.append(arguments) or _result(arguments["url"]))
+
+    response = server.handle_line(
+        '{"id":"2","method":"tools/call","params":{"name":"web_read","arguments":{"url":"https://example.com","cookie_file":"cookies.json","storage_state":"storage-state.json"}}}'
+    )
+
+    assert response["ok"] is True
+    assert seen[0]["cookie_file"] == "cookies.json"
+    assert seen[0]["storage_state"] == "storage-state.json"
+
+
+def test_tools_call_passes_query_to_xiaohongshu_handler():
+    seen = []
+    server = StdioServer(xiaohongshu_api=lambda arguments: seen.append(arguments) or _result("https://example.com"))
+
+    response = server.handle_line(
+        '{"id":"2","method":"tools/call","params":{"name":"xiaohongshu_api","arguments":{"path":"/api/open/test","query":{"note_id":"abc"}}}}'
+    )
+
+    assert response["ok"] is True
+    assert seen[0]["query"] == {"note_id": "abc"}
 
 
 def test_invalid_json_returns_error():

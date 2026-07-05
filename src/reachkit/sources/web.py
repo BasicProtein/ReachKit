@@ -2,10 +2,11 @@ from __future__ import annotations
 
 from collections.abc import Callable
 
-from reachkit.core.errors import ParseError
+from reachkit.core.errors import InputError, ParseError
 from reachkit.core.models import RetrievedItem, SourceResult
 from reachkit.normalization.html_text import html_to_text
 from reachkit.normalization.text import compact_text
+from reachkit.runtime.cookies import load_cookie_header
 from reachkit.runtime.http import HttpResponse, fetch_text
 
 FetchText = Callable[..., HttpResponse]
@@ -17,9 +18,19 @@ class WebReader:
     def __init__(self, fetcher: FetchText | None = None) -> None:
         self._fetcher = fetcher
 
-    def read(self, url: str, max_chars: int | None = None) -> SourceResult:
+    def read(
+        self,
+        url: str,
+        max_chars: int | None = None,
+        cookie_file: str | None = None,
+        storage_state: str | None = None,
+    ) -> SourceResult:
         active_fetcher = self._fetcher or fetch_text
-        response = active_fetcher(url)
+        if cookie_file and storage_state:
+            raise InputError("Use either cookie_file or storage_state, not both")
+        cookie_source = cookie_file or storage_state
+        headers = {"Cookie": load_cookie_header(cookie_source)} if cookie_source else None
+        response = active_fetcher(url, headers=headers)
         content_type = response.headers.get("Content-Type") or response.headers.get("content-type")
         media_type = (content_type or "").split(";", 1)[0].strip().lower()
         warnings: list[str] = []

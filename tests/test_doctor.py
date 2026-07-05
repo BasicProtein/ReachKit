@@ -4,6 +4,10 @@ from reachkit.diagnostics import doctor
 def test_run_doctor_returns_required_and_warning_checks(monkeypatch):
     monkeypatch.setattr(doctor.sys, "version_info", (3, 11, 0))
     monkeypatch.delenv("GITHUB_TOKEN", raising=False)
+    monkeypatch.delenv("X_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("TWITTER_BEARER_TOKEN", raising=False)
+    monkeypatch.delenv("XHS_APP_KEY", raising=False)
+    monkeypatch.delenv("XHS_APP_SECRET", raising=False)
 
     issues = doctor.run_doctor(include_network=False)
 
@@ -12,6 +16,8 @@ def test_run_doctor_returns_required_and_warning_checks(monkeypatch):
     assert by_code["utf8_io"].required is True
     assert by_code["https_runtime"].required is True
     assert by_code["github_token"].level == "warning"
+    assert by_code["x_token"].level == "warning"
+    assert by_code["xhs_credentials"].level == "warning"
     assert doctor.required_checks_failed(issues) is False
 
 

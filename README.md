@@ -7,9 +7,9 @@
   <a href="docs/README.ko.md"><img alt="한국어" src="https://img.shields.io/badge/README-%ED%95%9C%EA%B5%AD%EC%96%B4-2f81f7?style=flat-square"></a>
 </p>
 
-ReachKit is a Python CLI and library for giving AI agents clean, predictable access to public web pages, RSS or Atom feeds, and GitHub content.
+ReachKit is a Python CLI and library for giving AI agents clean, predictable access to public web pages, RSS or Atom feeds, GitHub content, YouTube transcripts, X posts, Xiaohongshu open API JSON, and Bilibili video metadata.
 
-It is built for agent workflows that need retrieval without a browser session, login flow, crawler farm, or paid search stack. Give it a public URL, feed, repository, file path, or GitHub search query. ReachKit returns normalized text records with stable JSON fields that an agent can inspect, cite, store, rank, or pass into another tool.
+It is built for agent workflows that need retrieval without a browser session, login flow, crawler farm, or paid search stack. Give it a public URL, feed, repository, file path, GitHub search query, YouTube video, X post id, Xiaohongshu open API path, or Bilibili video id. ReachKit returns normalized text records with stable JSON fields that an agent can inspect, cite, store, rank, or pass into another tool.
 
 ## Why ReachKit exists
 
@@ -43,22 +43,29 @@ In short: use ReachKit when the hard part is not ranking the whole web, but turn
 ReachKit currently supports:
 
 - Public URL reading for `text/html`, `text/plain`, and other readable `text/*` responses.
+- Explicit cookie input for URL reads, using JSON cookie lists, Netscape cookie files, or Playwright storage state files supplied by the user.
 - HTML title extraction and readable text cleanup using the Python standard library.
 - RSS and Atom feed parsing with normalized entry metadata.
 - GitHub repository metadata through the public GitHub REST API.
 - GitHub file reading through the contents API, including base64 text files.
 - GitHub repository search with stable item fields.
+- YouTube public transcript reading when timed text is available.
+- X post reading through the official API with `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN`.
+- Xiaohongshu open API JSON reading with `XHS_APP_KEY` and `XHS_APP_SECRET`.
+- Bilibili public video metadata reading for BV video ids.
+- Optional rendered page reading through `reachkit[browser]` for pages the user can access.
 - A `doctor` command for Python version, UTF-8 I/O, HTTPS runtime, GitHub token, and network checks.
 - A newline-delimited JSON stdio server for agent tool integration.
 - Text and JSON output from content commands.
 
-ReachKit does not try to be a full web crawler. It does not use browser sessions, cookies, login-only pages, social media scraping, audio, video, or paid search APIs.
+ReachKit does not try to be a full web crawler. It does not use browser sessions, read browser profiles, solve access challenges, operate proxy pools, or work with login-only pages unless the user explicitly supplies a cookie file for a URL read.
 
 ## Good fits
 
 ReachKit is useful when you are building:
 
 - AI agent tools that need public web page text.
+- Workflows that need YouTube transcript text, X post text, Xiaohongshu open API JSON, or Bilibili video metadata in the same JSON shape as other sources.
 - Retrieval workflows for README files, docs pages, and release feeds.
 - Research assistants that read RSS or Atom feeds before summarizing.
 - GitHub repository discovery tools for developer agents.
@@ -68,7 +75,7 @@ ReachKit is useful when you are building:
 - CI checks that monitor public docs, changelogs, feeds, or GitHub files.
 - Developer research scripts that need web, feed, and repository context without a browser.
 
-If you need JavaScript rendering, authenticated sites, large-scale crawling, or anti-abuse platform handling, ReachKit is intentionally not that layer.
+If you need JavaScript rendering for pages you can access, use the optional browser extra. If you need large-scale crawling, challenge solving, proxy pools, or anti-abuse platform handling, ReachKit is intentionally not that layer.
 
 ## Install
 
@@ -88,6 +95,13 @@ uv pip install --python .venv/Scripts/python.exe -e . pytest
 ```
 
 On macOS or Linux, the virtual environment Python path is usually `.venv/bin/python`.
+
+For rendered page reads, install the optional browser extra and the browser runtime:
+
+```bash
+python -m pip install -e ".[browser]"
+python -m playwright install chromium
+```
 
 ## Quick start
 
@@ -119,6 +133,49 @@ Search public GitHub repositories:
 
 ```bash
 reachkit search github "agent tools" --limit 5 --format json
+```
+
+Read a YouTube transcript when public timed text is available:
+
+```bash
+reachkit read youtube dQw4w9WgXcQ --lang en --format json
+```
+
+Read an X post through the official API:
+
+```bash
+reachkit read x 1234567890 --format json
+```
+
+Read Xiaohongshu open API JSON with configured app credentials:
+
+```bash
+reachkit read xiaohongshu /api/open/path --param note_id=abc --format json
+```
+
+Read public Bilibili video metadata by BV id or av id:
+
+```bash
+reachkit read bilibili BV1xx411c7mD --format json
+reachkit read bilibili av123456 --format json
+```
+
+Read a URL with an explicit cookie file:
+
+```bash
+reachkit read url https://example.com --cookie-file cookies.json --format json
+```
+
+Read a URL with an explicit Playwright storage state file:
+
+```bash
+reachkit read url https://example.com --storage-state storage-state.json --format json
+```
+
+Read rendered page text with the optional browser extra:
+
+```bash
+reachkit read browser https://example.com --storage-state storage-state.json --format json
 ```
 
 Check local readiness:
@@ -157,7 +214,7 @@ Content commands return plain text by default. Add `--format json` to get a stab
 
 Every content result has:
 
-- `source`: `web`, `rss`, or `github`.
+- `source`: `web`, `rss`, `github`, `youtube`, `x`, `xiaohongshu`, or `bilibili`.
 - `url`: the request URL or canonical result URL when available.
 - `title`: the page, feed, repository, search, or file title when available.
 - `content_type`: the HTTP content type when available.
@@ -184,24 +241,49 @@ Call a tool:
 
 Available tools:
 
-- `web_read`: `url`, optional `max_chars`.
+- `web_read`: `url`, optional `max_chars`, optional `cookie_file`, optional `storage_state`.
 - `rss_read`: `url`, optional `limit`.
 - `github_read`: `repo`, optional `path`, optional `ref`.
 - `github_search`: `query`, optional `limit`.
+- `youtube_transcript`: `video`, optional `lang`, optional `max_chars`.
+- `x_read`: `post`.
+- `xiaohongshu_api`: `path`, optional `query` object.
+- `bilibili_read`: `video`.
+- `browser_read`: `url`, optional `storage_state`, optional `wait_until`, optional `max_chars`.
 
 See `examples/stdio-request.jsonl` for a small request set.
 
-## GitHub access
+## Platform access
 
-ReachKit uses public GitHub REST endpoints. You can run without a token, but GitHub rate limits unauthenticated requests more aggressively.
+ReachKit uses public GitHub REST endpoints. You can run without a token, but GitHub rate limits unauthenticated requests more aggressively. To raise the limit, set `GITHUB_TOKEN`.
 
-To raise the limit, set:
+X post reading uses the official API and requires `X_BEARER_TOKEN` or `TWITTER_BEARER_TOKEN`.
 
-```bash
-GITHUB_TOKEN=your_token_here
+Xiaohongshu reading uses open API paths and requires `XHS_APP_KEY` and `XHS_APP_SECRET`.
+
+On PowerShell, set credentials before running the command:
+
+```powershell
+$env:X_BEARER_TOKEN = "your_token_here"
+$env:XHS_APP_KEY = "your_key"
+$env:XHS_APP_SECRET = "your_secret"
 ```
 
-The token is used only as an HTTP bearer token for GitHub API requests.
+On macOS or Linux shells:
+
+```bash
+export X_BEARER_TOKEN=your_token_here
+export XHS_APP_KEY=your_key
+export XHS_APP_SECRET=your_secret
+```
+
+YouTube transcript reading uses public timed text when a transcript track is available. Some videos do not expose public timed text.
+
+Bilibili video reading fetches public metadata for BV ids.
+
+URL reads can use explicit cookie input with `--cookie-file` or `--storage-state`. ReachKit reads JSON cookie lists, Netscape cookie files, and Playwright storage state files supplied by the user. These files are never required for public URL reads and should stay out of Git.
+
+Rendered page reads use the optional browser extra. They can use an explicit storage state file for pages the user can access, but ReachKit does not extract browser profile data.
 
 ## Limits and behavior
 
@@ -209,6 +291,7 @@ The token is used only as an HTTP bearer token for GitHub API requests.
 - `--max-chars` defaults to `12000` and accepts values from `1` to `100000`.
 - `--limit` defaults to `10` and caps at `50`.
 - HTTP uses `http://` and `https://` only.
+- Cookie and storage state files must be supplied explicitly. ReachKit does not read browser profile storage.
 - The default HTTP timeout is `15` seconds.
 - Oversized responses, non-2xx responses, invalid XML, invalid input, and binary GitHub files return user-facing errors.
 - `doctor` returns exit code `1` only when a required check fails.
@@ -231,7 +314,7 @@ Agents often need fresh public context, but raw web pages, feed XML, and GitHub 
 
 ### Is ReachKit a web crawler?
 
-No. ReachKit is a focused public content reader. It handles single URLs, feeds, GitHub repository metadata, GitHub text files, and GitHub repository search. It does not crawl whole sites, render JavaScript, or work with login-only content.
+No. ReachKit is a focused public content reader. It handles single URLs, feeds, GitHub repository metadata, GitHub text files, GitHub repository search, YouTube transcripts, X posts, Xiaohongshu open API JSON, and Bilibili video metadata. It does not crawl whole sites, render JavaScript, or operate platform bypass flows.
 
 ### How is ReachKit different from hosted web search APIs?
 
@@ -243,7 +326,7 @@ Yes, for public pages, feeds, and GitHub resources. ReachKit can turn those inpu
 
 ### What searches should find this project?
 
-ReachKit is meant for searches like "Python CLI for AI agent web retrieval", "AI agent tool for reading public URLs", "RSS to JSON command line tool", "GitHub repository search CLI JSON", "stdio tools/list tools/call Python server", "public web page to clean text Python", and "GitHub README reader for AI agents".
+ReachKit is meant for searches like "Python CLI for AI agent web retrieval", "AI agent tool for reading public URLs", "RSS to JSON command line tool", "GitHub repository search CLI JSON", "YouTube transcript CLI JSON", "X API post reader Python", "Xiaohongshu open API Python", "Bilibili video metadata CLI", "stdio tools/list tools/call Python server", "public web page to clean text Python", and "GitHub README reader for AI agents".
 
 ## Development
 

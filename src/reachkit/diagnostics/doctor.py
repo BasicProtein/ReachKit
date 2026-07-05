@@ -40,6 +40,18 @@ def check_github_token() -> DiagnosticIssue:
     return DiagnosticIssue("github_token", "warning", "GitHub token is not configured.")
 
 
+def check_x_token() -> DiagnosticIssue:
+    if os.environ.get("X_BEARER_TOKEN") or os.environ.get("TWITTER_BEARER_TOKEN"):
+        return DiagnosticIssue("x_token", "ok", "X API token is configured.")
+    return DiagnosticIssue("x_token", "warning", "X API token is not configured.")
+
+
+def check_xhs_credentials() -> DiagnosticIssue:
+    if os.environ.get("XHS_APP_KEY") and os.environ.get("XHS_APP_SECRET"):
+        return DiagnosticIssue("xhs_credentials", "ok", "Xiaohongshu API credentials are configured.")
+    return DiagnosticIssue("xhs_credentials", "warning", "Xiaohongshu API credentials are not configured.")
+
+
 def check_network_example() -> DiagnosticIssue:
     try:
         fetch_text("https://example.com")
@@ -54,6 +66,8 @@ def run_doctor(include_network: bool = True) -> list[DiagnosticIssue]:
         check_utf8_io(),
         check_https_runtime(),
         check_github_token(),
+        check_x_token(),
+        check_xhs_credentials(),
     ]
     if include_network:
         issues.append(check_network_example())

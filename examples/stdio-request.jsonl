@@ -1,4 +1,8 @@
 {"id":"1","method":"tools/list","params":{}}
 {"id":"2","method":"tools/call","params":{"name":"web_read","arguments":{"url":"https://example.com","max_chars":2000}}}
 {"id":"3","method":"tools/call","params":{"name":"github_search","arguments":{"query":"agent tools","limit":3}}}
-{"id":"4","method":"tools/call","params":{"name":"missing_tool","arguments":{}}}
+{"id":"4","method":"tools/call","params":{"name":"youtube_transcript","arguments":{"video":"dQw4w9WgXcQ","lang":"en","max_chars":2000}}}
+{"id":"5","method":"tools/call","params":{"name":"xiaohongshu_api","arguments":{"path":"/api/open/path"}}}
+{"id":"6","method":"tools/call","params":{"name":"bilibili_read","arguments":{"video":"BV1xx411c7mD"}}}
+{"id":"7","method":"tools/call","params":{"name":"browser_read","arguments":{"url":"https://example.com","storage_state":"storage-state.json","max_chars":2000}}}
+{"id":"8","method":"tools/call","params":{"name":"missing_tool","arguments":{}}}
